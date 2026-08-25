@@ -1,0 +1,63 @@
+import { apiFetch } from './client';
+import type {
+  AnalysisResult,
+  CoordinatorPlanResponse,
+  CreateIncidentRequest,
+  EvidenceItem,
+  Incident,
+  InvestigatorReportResponse,
+} from './types';
+
+export function createIncident(request: CreateIncidentRequest): Promise<Incident> {
+  return apiFetch<Incident>('/api/incidents', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+}
+
+export function getIncident(id: string): Promise<Incident> {
+  return apiFetch<Incident>(`/api/incidents/${id}`);
+}
+
+export function uploadEmailEvidence(id: string, file: File): Promise<EvidenceItem> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiFetch<EvidenceItem>(`/api/incidents/${id}/evidence/email`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function analyzeIncident(id: string): Promise<AnalysisResult> {
+  return apiFetch<AnalysisResult>(`/api/incidents/${id}/analyze`, {
+    method: 'POST',
+  });
+}
+
+export function getIncidentAnalysis(id: string): Promise<AnalysisResult> {
+  return apiFetch<AnalysisResult>(`/api/incidents/${id}/analysis`);
+}
+
+export function generateCoordinatorPlan(id: string): Promise<CoordinatorPlanResponse> {
+  return apiFetch<CoordinatorPlanResponse>(`/api/incidents/${id}/coordinator/plan`, {
+    method: 'POST',
+  });
+}
+
+export function getCoordinatorPlan(id: string): Promise<CoordinatorPlanResponse> {
+  return apiFetch<CoordinatorPlanResponse>(`/api/incidents/${id}/coordinator/plan`);
+}
+
+export function runInvestigator(id: string): Promise<InvestigatorReportResponse> {
+  return apiFetch<InvestigatorReportResponse>(`/api/incidents/${id}/investigator/run`, {
+    method: 'POST',
+  });
+}
+
+export function getInvestigatorReport(id: string): Promise<InvestigatorReportResponse> {
+  return apiFetch<InvestigatorReportResponse>(`/api/incidents/${id}/investigator/report`);
+}

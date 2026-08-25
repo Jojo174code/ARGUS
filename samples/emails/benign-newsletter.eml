@@ -1,0 +1,37 @@
+From: Community Updates <newsletter@community.example>
+To: volunteer@recipient.example
+Subject: August volunteer newsletter
+Date: Mon, 24 Aug 2026 09:00:00 +0000
+Message-ID: <newsletter-20260824@community.example>
+Return-Path: <newsletter@community.example>
+Received: from mail.community.example (mail.community.example [192.0.2.50]) by mx.recipient.example with ESMTPS id ABC123 for <volunteer@recipient.example>; Mon, 24 Aug 2026 09:00:01 +0000
+Authentication-Results: mx.recipient.example; spf=pass smtp.mailfrom=community.example; dkim=pass header.d=community.example; dmarc=pass action=none header.from=community.example
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="newsletter-boundary"
+
+--newsletter-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Hello volunteers,
+
+Thank you for supporting our community pantry.
+View upcoming events at https://community.example/events and volunteer resources at https://community.example/volunteer.
+
+Regards,
+Community Updates
+
+--newsletter-boundary
+Content-Type: text/html; charset="utf-8"
+
+<html>
+  <body>
+    <p>Hello volunteers,</p>
+    <p>Thank you for supporting our community pantry.</p>
+    <p>
+      <a href="https://community.example/events">https://community.example/events</a><br />
+      <a href="https://community.example/volunteer">Volunteer Resources</a>
+    </p>
+  </body>
+</html>
+
+--newsletter-boundary--

@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# .NET
+**/bin/
+**/obj/
+TestResults/
+
+# Node
+**/node_modules/
+**/dist/
+
+# Logs
+*.log
+
+# Coverage
+coverage/

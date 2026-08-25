@@ -1,0 +1,17 @@
+From: Dana Smith <dana@school.example>
+To: principal@recipient.example
+Subject: Meeting notes and next steps
+Date: Mon, 24 Aug 2026 10:15:00 +0000
+Message-ID: <meeting-notes-20260824@school.example>
+Return-Path: <dana@school.example>
+Received: from mail.school.example (mail.school.example [192.0.2.60]) by mx.recipient.example with ESMTPS id DEF456 for <principal@recipient.example>; Mon, 24 Aug 2026 10:15:01 +0000
+Authentication-Results: mx.recipient.example; spf=pass smtp.mailfrom=school.example; dkim=pass header.d=school.example; dmarc=pass action=none header.from=school.example
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hello,
+
+Attached are the meeting notes from this morning. Please review the action items before Friday.
+
+Thanks,
+Dana

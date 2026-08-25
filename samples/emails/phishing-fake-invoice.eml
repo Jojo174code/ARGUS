@@ -1,0 +1,26 @@
+From: Billing Team <billing@accounts-payable.example>
+To: office@recipient.example
+Subject: Invoice 88421 ready for payment
+Date: Mon, 24 Aug 2026 12:30:00 +0000
+Message-ID: <invoice-88421@accounts-payable.example>
+Return-Path: <billing@accounts-payable.example>
+Received: from mail.accounts-payable.example (mail.accounts-payable.example [203.0.113.45]) by mx.recipient.example with ESMTPS id JKL012 for <office@recipient.example>; Mon, 24 Aug 2026 12:30:01 +0000
+Authentication-Results: mx.recipient.example; spf=pass smtp.mailfrom=accounts-payable.example; dkim=fail header.d=accounts-payable.example; dmarc=pass action=none header.from=accounts-payable.example
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="invoice-boundary"
+
+--invoice-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Please review the attached invoice and complete payment today.
+Portal: http://203.0.113.24/pay
+Backup portal: https://xn--paymnt-2va.example/pay
+
+--invoice-boundary
+Content-Type: application/pdf; name="invoice.pdf"
+Content-Disposition: attachment; filename="invoice.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJUZha2UgUERGIGNvbnRlbnQgZm9yIHNhZmUgdGVzdGluZwo=
+
+--invoice-boundary--

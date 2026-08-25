@@ -1,0 +1,31 @@
+From: Microsoft Security <notice@alerts-example.net>
+To: staff@recipient.example
+Reply-To: support@identity-help.example
+Subject: Urgent: verify your login to avoid account suspension
+Date: Mon, 24 Aug 2026 11:20:00 +0000
+Message-ID: <security-alert-20260824@alerts-example.net>
+Return-Path: <bounce@mailer-host.example>
+Received: from smtp.alerts-example.net (smtp.alerts-example.net [198.51.100.45]) by mx.recipient.example with ESMTPS id GHI789 for <staff@recipient.example>; Mon, 24 Aug 2026 11:20:01 +0000
+Authentication-Results: mx.recipient.example; spf=fail smtp.mailfrom=alerts-example.net; dmarc=fail action=quarantine header.from=alerts-example.net
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="phish-boundary"
+
+--phish-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Urgent action required.
+Your account will be suspended unless you verify your login immediately.
+Use the secure portal at https://login-microsoft.secure-access.example.net/session.
+
+--phish-boundary
+Content-Type: text/html; charset="utf-8"
+
+<html>
+  <body>
+    <p>Urgent action required.</p>
+    <p>Your account will be suspended unless you verify your login immediately.</p>
+    <p><a href="https://login-microsoft.secure-access.example.net/session">https://login.microsoftonline.com</a></p>
+  </body>
+</html>
+
+--phish-boundary--

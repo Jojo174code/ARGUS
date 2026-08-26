@@ -15,17 +15,26 @@ public sealed class IncidentsController : ControllerBase
     private readonly IIncidentInvestigationService _incidentInvestigationService;
     private readonly ICoordinatorService _coordinatorService;
     private readonly IInvestigatorService _investigatorService;
+    private readonly IResponseEducationService _responseEducationService;
+    private readonly IEducationChatService _educationChatService;
+    private readonly IAgenticWorkflowService _agenticWorkflowService;
 
     public IncidentsController(
         IIncidentService incidentService,
         IIncidentInvestigationService incidentInvestigationService,
         ICoordinatorService coordinatorService,
-        IInvestigatorService investigatorService)
+        IInvestigatorService investigatorService,
+        IResponseEducationService responseEducationService,
+        IEducationChatService educationChatService,
+        IAgenticWorkflowService agenticWorkflowService)
     {
         _incidentService = incidentService;
         _incidentInvestigationService = incidentInvestigationService;
         _coordinatorService = coordinatorService;
         _investigatorService = investigatorService;
+        _responseEducationService = responseEducationService;
+        _educationChatService = educationChatService;
+        _agenticWorkflowService = agenticWorkflowService;
     }
 
     [HttpPost]
@@ -217,5 +226,111 @@ public sealed class IncidentsController : ControllerBase
     {
         var report = await _investigatorService.GetLatestSuccessfulReportAsync(id, cancellationToken);
         return report is null ? NotFound() : Ok(report);
+    }
+
+    [HttpPost("{id:guid}/response/generate")]
+    [EnableRateLimiting("response")]
+    [ProducesResponseType<ResponseEducationPackageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<ResponseEducationPackageDto>> GenerateResponseEducationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _responseEducationService.GenerateAsync(id, cancellationToken));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ResponseEducationPrerequisiteException ex)
+        {
+            ModelState.AddModelError("response", ex.Message);
+            return ValidationProblem(ModelState);
+        }
+        catch (ResponseEducationValidationException ex)
+        {
+            ModelState.AddModelError("package", string.Join(" ", ex.ValidationErrors));
+            return ValidationProblem(ModelState);
+        }
+        catch (ResponseEducationUnavailableException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Response and education generation is temporarily unavailable.",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    [HttpGet("{id:guid}/response")]
+    [ProducesResponseType<ResponseEducationPackageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResponseEducationPackageDto>> GetResponseEducationAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var package = await _responseEducationService.GetLatestSuccessfulPackageAsync(id, cancellationToken);
+        return package is null ? NotFound() : Ok(package);
+    }
+
+    [HttpPost("{id:guid}/education/chat")]
+    [EnableRateLimiting("response")]
+    [ProducesResponseType<EducationChatResponseDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<EducationChatResponseDto>> ChatEducationAsync(
+        Guid id,
+        [FromBody] EducationChatRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _educationChatService.ChatAsync(id, request, cancellationToken));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            ModelState.AddModelError("question", ex.Message);
+            return ValidationProblem(ModelState);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Education assistant is temporarily unavailable.",
+                Detail = ex.Message
+            });
+        }
+    }
+
+    [HttpPost("{id:guid}/workflow/run")]
+    [EnableRateLimiting("workflow")]
+    [ProducesResponseType<AgenticWorkflowResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AgenticWorkflowResultDto>> RunWorkflowAsync(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _agenticWorkflowService.RunAsync(id, cancellationToken));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpGet("{id:guid}/workflow")]
+    [ProducesResponseType<AgenticWorkflowResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AgenticWorkflowResultDto>> GetWorkflowAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var workflow = await _agenticWorkflowService.GetLatestAsync(id, cancellationToken);
+        return workflow is null ? NotFound() : Ok(workflow);
     }
 }

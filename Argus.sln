@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Argus.UnitTests", "tests\Ar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Argus.IntegrationTests", "tests\Argus.IntegrationTests\Argus.IntegrationTests.csproj", "{29BFFDD8-8DDF-4476-AE74-8000AD9D1027}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Argus.EvaluationTests", "tests\Argus.EvaluationTests\Argus.EvaluationTests.csproj", "{C5426B3D-8CF1-45A2-BC82-AC70A0A038AE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{29BFFDD8-8DDF-4476-AE74-8000AD9D1027}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{29BFFDD8-8DDF-4476-AE74-8000AD9D1027}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{29BFFDD8-8DDF-4476-AE74-8000AD9D1027}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C5426B3D-8CF1-45A2-BC82-AC70A0A038AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C5426B3D-8CF1-45A2-BC82-AC70A0A038AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C5426B3D-8CF1-45A2-BC82-AC70A0A038AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C5426B3D-8CF1-45A2-BC82-AC70A0A038AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{EFFE11CA-1CE6-406F-93C2-0B03CA49CF66} = {5B027B5F-FAE0-42BA-89FD-F1E035D47858}
@@ -60,5 +66,6 @@ Global
 		{D2C668AD-0146-4416-9FA1-2B48A97A00AA} = {5B027B5F-FAE0-42BA-89FD-F1E035D47858}
 		{8C945F5D-4CFC-47A4-A157-BF1230B2FE21} = {D0C5DD11-F171-453F-BD57-2F9933391CB7}
 		{29BFFDD8-8DDF-4476-AE74-8000AD9D1027} = {D0C5DD11-F171-453F-BD57-2F9933391CB7}
+		{C5426B3D-8CF1-45A2-BC82-AC70A0A038AE} = {D0C5DD11-F171-453F-BD57-2F9933391CB7}
 	EndGlobalSection
 EndGlobal

@@ -20,6 +20,10 @@ public sealed class ArgusDbContext : DbContext
 
     public DbSet<InvestigatorRun> InvestigatorRuns => Set<InvestigatorRun>();
 
+    public DbSet<ResponseEducationRun> ResponseEducationRuns => Set<ResponseEducationRun>();
+
+    public DbSet<AgenticWorkflowRun> AgenticWorkflowRuns => Set<AgenticWorkflowRun>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ArgusDbContext).Assembly);

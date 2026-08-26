@@ -33,7 +33,6 @@ public sealed class OpenAiLlmClient : ILlmClient
         var payload = new
         {
             model = _options.Model,
-            temperature = 0,
             response_format = new { type = "json_object" },
             messages = new object[]
             {
@@ -51,7 +50,10 @@ public sealed class OpenAiLlmClient : ILlmClient
 
         if (!response.IsSuccessStatusCode)
         {
-            throw new HttpRequestException($"OpenAI request failed with status {(int)response.StatusCode}.");
+            var detail = responseContent.Length > 500
+                ? responseContent[..500]
+                : responseContent;
+            throw new HttpRequestException($"OpenAI request failed with status {(int)response.StatusCode}. Response: {detail}");
         }
 
         using var document = JsonDocument.Parse(responseContent);
@@ -64,14 +66,38 @@ public sealed class OpenAiLlmClient : ILlmClient
             throw new HttpRequestException("OpenAI returned an empty coordinator response.");
         }
 
-        return new LlmResponse(model ?? _options.Model, content);
+        return new LlmResponse(model ?? _options.Model, NormalizeJsonContent(content));
     }
 
     private void EnsureConfigured()
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey) || string.IsNullOrWhiteSpace(_options.Model))
         {
-            throw new InvalidOperationException("Coordinator LLM provider is not configured. Set OPENAI_API_KEY and OPENAI_MODEL.");
+            throw new InvalidOperationException("Coordinator LLM provider is not configured. Set OPENAI_API_KEY or LITELLM_API_KEY, and OPENAI_MODEL or LITELLM_MODEL.");
         }
+    }
+
+    private static string NormalizeJsonContent(string content)
+    {
+        var trimmed = content.Trim();
+
+        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        var lines = trimmed.Split('\n');
+        if (lines.Length < 3)
+        {
+            return trimmed;
+        }
+
+        var body = lines.Skip(1).ToList();
+        if (body.Count > 0 && body[^1].Trim().StartsWith("```", StringComparison.Ordinal))
+        {
+            body.RemoveAt(body.Count - 1);
+        }
+
+        return string.Join('\n', body).Trim();
     }
 }

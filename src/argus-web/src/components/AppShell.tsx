@@ -5,8 +5,11 @@ export function AppShell() {
     <div className="app-shell">
       <header className="topbar">
         <Link to="/" className="brand" aria-label="ARGUS home">
-          <span className="brand-mark">ARGUS</span>
-          <span className="brand-subtitle">Deterministic Email Triage</span>
+          <img className="brand-logo" src="/media/argus-agentic-logo-2026.png" alt="" />
+          <span>
+            <span className="brand-mark">ARGUS</span>
+            <span className="brand-subtitle">Deterministic Email Triage</span>
+          </span>
         </Link>
         <nav>
           <ul className="topnav">

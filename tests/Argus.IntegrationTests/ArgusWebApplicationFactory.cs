@@ -9,6 +9,7 @@ public sealed class ArgusWebApplicationFactory : WebApplicationFactory<Program>
 {
     private const long DefaultMaxUploadSizeBytes = 2 * 1024 * 1024;
 
+    private readonly ILlmClient? _llmClient;
     private readonly string _uploadDirectory = Path.Combine(Path.GetTempPath(), $"argus-integration-{Guid.NewGuid():N}");
     private readonly string _databaseName = $"argus-integration-{Guid.NewGuid():N}";
     private readonly string? _originalProvider = Environment.GetEnvironmentVariable("Database__Provider");
@@ -20,8 +21,9 @@ public sealed class ArgusWebApplicationFactory : WebApplicationFactory<Program>
 
     public long MaxUploadSizeBytes => DefaultMaxUploadSizeBytes;
 
-    public ArgusWebApplicationFactory()
+    public ArgusWebApplicationFactory(ILlmClient? llmClient = null)
     {
+        _llmClient = llmClient;
         Environment.SetEnvironmentVariable("Database__Provider", "InMemory");
         Environment.SetEnvironmentVariable("Database__DatabaseName", _databaseName);
         Environment.SetEnvironmentVariable("Uploads__RootDirectory", _uploadDirectory);
@@ -33,7 +35,7 @@ public sealed class ArgusWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.ConfigureServices(services =>
         {
-            services.AddSingleton<ILlmClient, TestCoordinatorLlmClient>();
+            services.AddSingleton<ILlmClient>(_llmClient ?? new TestCoordinatorLlmClient());
         });
     }
 

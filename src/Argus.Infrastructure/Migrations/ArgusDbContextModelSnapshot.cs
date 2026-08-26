@@ -22,6 +22,65 @@ namespace Argus.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Argus.Domain.Entities.AgenticWorkflowRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlockingMissingInformationJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CoordinatorRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrentStage")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("FailureStage")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("InvestigatorRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ResponseEducationRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StageResultsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("SummaryMetricsJson")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncidentId", "StartedAt");
+
+                    b.ToTable("agentic_workflow_runs", (string)null);
+                });
+
             modelBuilder.Entity("Argus.Domain.Entities.CoordinatorRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -257,6 +316,68 @@ namespace Argus.Infrastructure.Migrations
                     b.ToTable("investigator_runs", (string)null);
                 });
 
+            modelBuilder.Entity("Argus.Domain.Entities.ResponseEducationRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("IncidentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InputJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("InvestigatorRunId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("OutputJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IncidentId", "StartedAt");
+
+                    b.ToTable("response_education_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Argus.Domain.Entities.AgenticWorkflowRun", b =>
+                {
+                    b.HasOne("Argus.Domain.Entities.Incident", "Incident")
+                        .WithMany()
+                        .HasForeignKey("IncidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Incident");
+                });
+
             modelBuilder.Entity("Argus.Domain.Entities.CoordinatorRun", b =>
                 {
                     b.HasOne("Argus.Domain.Entities.Incident", "Incident")
@@ -291,6 +412,17 @@ namespace Argus.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Argus.Domain.Entities.InvestigatorRun", b =>
+                {
+                    b.HasOne("Argus.Domain.Entities.Incident", "Incident")
+                        .WithMany()
+                        .HasForeignKey("IncidentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Incident");
+                });
+
+            modelBuilder.Entity("Argus.Domain.Entities.ResponseEducationRun", b =>
                 {
                     b.HasOne("Argus.Domain.Entities.Incident", "Incident")
                         .WithMany()

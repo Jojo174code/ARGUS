@@ -23,7 +23,7 @@ public sealed class CoordinatorWorkflowTests
         var generateResponse = await httpClient.PostAsync($"/api/incidents/{incident.Id}/coordinator/plan", content: null);
         Assert.Equal(HttpStatusCode.OK, generateResponse.StatusCode);
 
-        var generatedPlan = await generateResponse.Content.ReadFromJsonAsync<CoordinatorPlanDto>();
+        var generatedPlan = await generateResponse.Content.ReadArgusJsonAsync<CoordinatorPlanDto>();
         Assert.NotNull(generatedPlan);
         Assert.Equal(incident.Id, generatedPlan!.IncidentId);
         Assert.Equal("Completed", generatedPlan.Status);
@@ -35,7 +35,7 @@ public sealed class CoordinatorWorkflowTests
         var getResponse = await httpClient.GetAsync($"/api/incidents/{incident.Id}/coordinator/plan");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
 
-        var storedPlan = await getResponse.Content.ReadFromJsonAsync<CoordinatorPlanDto>();
+        var storedPlan = await getResponse.Content.ReadArgusJsonAsync<CoordinatorPlanDto>();
         Assert.NotNull(storedPlan);
         Assert.Equal(generatedPlan.IncidentId, storedPlan!.IncidentId);
         Assert.Equal(generatedPlan.Status, storedPlan.Status);
@@ -60,7 +60,7 @@ public sealed class CoordinatorWorkflowTests
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var incident = await response.Content.ReadFromJsonAsync<IncidentDto>();
+        var incident = await response.Content.ReadArgusJsonAsync<IncidentDto>();
         Assert.NotNull(incident);
         return incident!;
     }

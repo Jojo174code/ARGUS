@@ -49,17 +49,26 @@ public static class DependencyInjection
                 .ToList()
         }));
 
+        var llmApiKey = FirstNonEmpty(
+            configuration[$"{OpenAiOptions.SectionName}:ApiKey"],
+            Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
+            Environment.GetEnvironmentVariable("LITELLM_API_KEY"));
+        var llmModel = FirstNonEmpty(
+            configuration[$"{OpenAiOptions.SectionName}:Model"],
+            Environment.GetEnvironmentVariable("OPENAI_MODEL"),
+            Environment.GetEnvironmentVariable("LITELLM_MODEL"));
+        var llmBaseUrl = FirstNonEmpty(
+            Environment.GetEnvironmentVariable("OPENAI_BASE_URL"),
+            Environment.GetEnvironmentVariable("LITELLM_BASE_URL"),
+            configuration[$"{OpenAiOptions.SectionName}:BaseUrl"],
+            "https://api.openai.com/v1");
+        var normalizedLlmBaseUrl = EnsureTrailingSlash(llmBaseUrl ?? "https://api.openai.com/v1");
+
         services.AddSingleton(Options.Create(new OpenAiOptions
         {
-            ApiKey = configuration[$"{OpenAiOptions.SectionName}:ApiKey"]
-                ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
-                ?? string.Empty,
-            Model = configuration[$"{OpenAiOptions.SectionName}:Model"]
-                ?? Environment.GetEnvironmentVariable("OPENAI_MODEL")
-                ?? string.Empty,
-            BaseUrl = configuration[$"{OpenAiOptions.SectionName}:BaseUrl"]
-                ?? Environment.GetEnvironmentVariable("OPENAI_BASE_URL")
-                ?? "https://api.openai.com/v1"
+            ApiKey = llmApiKey ?? string.Empty,
+            Model = llmModel ?? string.Empty,
+            BaseUrl = normalizedLlmBaseUrl
         }));
 
         services.AddDbContext<ArgusDbContext>(options =>
@@ -77,10 +86,15 @@ public static class DependencyInjection
         services.AddScoped<IIncidentAnalysisRepository, IncidentAnalysisRepository>();
         services.AddScoped<ICoordinatorRunRepository, CoordinatorRunRepository>();
         services.AddScoped<IInvestigatorRunRepository, InvestigatorRunRepository>();
+        services.AddScoped<IResponseEducationRunRepository, ResponseEducationRunRepository>();
+        services.AddScoped<IAgenticWorkflowRunRepository, AgenticWorkflowRunRepository>();
         services.AddScoped<IIncidentService, IncidentService>();
         services.AddScoped<IIncidentInvestigationService, IncidentInvestigationService>();
         services.AddScoped<ICoordinatorService, CoordinatorService>();
         services.AddScoped<IInvestigatorService, InvestigatorService>();
+        services.AddScoped<IResponseEducationService, ResponseEducationService>();
+        services.AddScoped<IEducationChatService, EducationChatService>();
+        services.AddScoped<IAgenticWorkflowService, AgenticWorkflowService>();
         services.AddScoped<IEvidenceFileStore, LocalEvidenceFileStore>();
         services.AddScoped<IEmailParser, MimeKitEmailParser>();
         services.AddScoped<IMitreAttackMapper, StaticMitreAttackMapper>();
@@ -91,12 +105,29 @@ public static class DependencyInjection
         services.AddScoped<IInvestigationTool, MitreMappingTool>();
         services.AddHttpClient<ILlmClient, OpenAiLlmClient>(client =>
         {
-            client.BaseAddress = new Uri(configuration[$"{OpenAiOptions.SectionName}:BaseUrl"]
-                ?? Environment.GetEnvironmentVariable("OPENAI_BASE_URL")
-                ?? "https://api.openai.com/v1");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.BaseAddress = new Uri(normalizedLlmBaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(90);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("ARGUS/1.0");
         });
 
         return services;
+    }
+
+    private static string? FirstNonEmpty(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string EnsureTrailingSlash(string value)
+    {
+        return value.EndsWith('/') ? value : $"{value}/";
     }
 }

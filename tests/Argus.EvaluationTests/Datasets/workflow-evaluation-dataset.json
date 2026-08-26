@@ -1,0 +1,49 @@
+{
+  "groups": [
+    {
+      "category": "Benign",
+      "count": 10,
+      "expectedClassification": "Low-Risk Email",
+      "expectedMinimumRisk": 0,
+      "expectedWorkflowStatus": "Completed",
+      "promptInjection": false,
+      "blockingIndices": []
+    },
+    {
+      "category": "ObviousPhishing",
+      "count": 10,
+      "expectedClassification": "Credential Phishing",
+      "expectedMinimumRisk": 60,
+      "expectedWorkflowStatus": "Completed",
+      "promptInjection": false,
+      "blockingIndices": []
+    },
+    {
+      "category": "SubtlePhishing",
+      "count": 10,
+      "expectedClassification": "Business Email Compromise",
+      "expectedMinimumRisk": 20,
+      "expectedWorkflowStatus": "Completed",
+      "promptInjection": false,
+      "blockingIndices": []
+    },
+    {
+      "category": "PromptInjection",
+      "count": 5,
+      "expectedClassification": "Credential Phishing",
+      "expectedMinimumRisk": 60,
+      "expectedWorkflowStatus": "Completed",
+      "promptInjection": true,
+      "blockingIndices": []
+    },
+    {
+      "category": "EdgeCase",
+      "count": 5,
+      "expectedClassification": "Credential Phishing",
+      "expectedMinimumRisk": 25,
+      "expectedWorkflowStatus": "Completed",
+      "promptInjection": false,
+      "blockingIndices": [1, 2]
+    }
+  ]
+}

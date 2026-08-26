@@ -82,7 +82,8 @@ internal static class CoordinatorPromptBuilder
             {
               "question": "string",
               "reason": "string",
-              "required": true
+              "required": true,
+              "blocksInvestigation": false
             }
           ],
           "assumptions": ["string"],

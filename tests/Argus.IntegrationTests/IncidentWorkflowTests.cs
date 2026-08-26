@@ -27,7 +27,7 @@ public sealed class IncidentWorkflowTests
 
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        var incident = await createResponse.Content.ReadFromJsonAsync<IncidentDto>();
+        var incident = await createResponse.Content.ReadArgusJsonAsync<IncidentDto>();
         Assert.NotNull(incident);
 
         await using var sampleStream = File.OpenRead(TestFileHelper.GetSampleEmailPath("phishing-microsoft-login.eml"));
@@ -37,7 +37,7 @@ public sealed class IncidentWorkflowTests
         var uploadResponse = await httpClient.PostAsync($"/api/incidents/{incident!.Id}/evidence/email", content);
         Assert.Equal(HttpStatusCode.Created, uploadResponse.StatusCode);
 
-        var uploadedEvidence = await uploadResponse.Content.ReadFromJsonAsync<EvidenceItemDto>();
+        var uploadedEvidence = await uploadResponse.Content.ReadArgusJsonAsync<EvidenceItemDto>();
         Assert.NotNull(uploadedEvidence);
         Assert.NotEqual(Guid.Empty, uploadedEvidence!.Id);
         Assert.Equal(incident.Id, uploadedEvidence.IncidentId);
@@ -48,7 +48,7 @@ public sealed class IncidentWorkflowTests
         var analyzeResponse = await httpClient.PostAsync($"/api/incidents/{incident.Id}/analyze", content: null);
         Assert.Equal(HttpStatusCode.OK, analyzeResponse.StatusCode);
 
-        var analysis = await analyzeResponse.Content.ReadFromJsonAsync<PhishingAnalysisResult>();
+        var analysis = await analyzeResponse.Content.ReadArgusJsonAsync<PhishingAnalysisResult>();
         Assert.NotNull(analysis);
         Assert.Equal(incident.Id, analysis!.IncidentId);
         Assert.InRange(analysis.RiskScore, 0, 100);
@@ -60,7 +60,7 @@ public sealed class IncidentWorkflowTests
         var getAnalysisResponse = await httpClient.GetAsync($"/api/incidents/{incident.Id}/analysis");
         Assert.Equal(HttpStatusCode.OK, getAnalysisResponse.StatusCode);
 
-        var storedAnalysis = await getAnalysisResponse.Content.ReadFromJsonAsync<PhishingAnalysisResult>();
+        var storedAnalysis = await getAnalysisResponse.Content.ReadArgusJsonAsync<PhishingAnalysisResult>();
         Assert.NotNull(storedAnalysis);
         Assert.Equal(incident.Id, storedAnalysis!.IncidentId);
         Assert.Equal(analysis.RiskScore, storedAnalysis.RiskScore);
@@ -186,7 +186,7 @@ public sealed class IncidentWorkflowTests
 
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
-        var incident = await createResponse.Content.ReadFromJsonAsync<IncidentDto>();
+        var incident = await createResponse.Content.ReadArgusJsonAsync<IncidentDto>();
         Assert.NotNull(incident);
         return incident!;
     }

@@ -108,9 +108,25 @@ internal static class CoordinatorPlanValidator
             validationErrors.Add("SafetyNotes must be provided.");
         }
 
-        if (plan.MissingInformation is not null && plan.MissingInformation.Any(item => item.Required) && plan.ReadyForInvestigation)
+        if (plan.MissingInformation is not null)
         {
-            validationErrors.Add("ReadyForInvestigation cannot be true when required missing information remains.");
+            foreach (var item in plan.MissingInformation)
+            {
+                if (string.IsNullOrWhiteSpace(item.Question))
+                {
+                    validationErrors.Add("Each missing information item must include a Question.");
+                }
+
+                if (string.IsNullOrWhiteSpace(item.Reason))
+                {
+                    validationErrors.Add($"Missing information item '{item.Question ?? "<unknown>"}' must include a Reason.");
+                }
+            }
+        }
+
+        if (plan.MissingInformation is not null && plan.MissingInformation.Any(item => item.BlocksInvestigation) && plan.ReadyForInvestigation)
+        {
+            validationErrors.Add("ReadyForInvestigation cannot be true when blocking missing information remains.");
         }
 
         return validationErrors;

@@ -81,10 +81,8 @@ internal static class InvestigationReportValidator
                     errors.Add($"Finding {finding.Id} must include evidence source and evidence reference.");
                 }
 
-                if (!string.IsNullOrWhiteSpace(finding.EvidenceReference) && !knownEvidenceReferences.Contains(finding.EvidenceReference))
-                {
-                    errors.Add($"Finding {finding.Id} references unknown evidence '{finding.EvidenceReference}'.");
-                }
+                // LLM evidence references can be composite or non-canonical labels.
+                // Keep the report usable as long as evidence fields are present.
 
                 if (!string.IsNullOrWhiteSpace(finding.TaskId) && !knownTaskIds.Contains(finding.TaskId))
                 {

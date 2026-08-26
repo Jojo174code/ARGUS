@@ -24,3 +24,15 @@ TestResults/
 
 # Coverage
 coverage/
+
+# Evaluation artifacts
+artifacts/evaluation/latest.json
+artifacts/evaluation/latest.md
+
+# Local runtime data
+src/Argus.Api/App_Data/
+
+# Original local media imports; deployable copies live under src/argus-web/public/media/
+/ChatGPT Image Aug 26, 2026, 12_27_08 PM.png
+/Gemini_Generated_Image_pbbzklpbbzklpbbz.jpeg
+/i_want_the_eye_to_blink_too.mp4

@@ -4,14 +4,26 @@ import { Link, useParams } from 'react-router-dom';
 import {
   analyzeIncident,
   generateCoordinatorPlan,
+  generateResponseEducationPackage,
   getCoordinatorPlan,
   getIncident,
   getIncidentAnalysis,
   getInvestigatorReport,
+  getResponseEducationPackage,
+  getWorkflow,
+  runFullWorkflow,
   runInvestigator,
   uploadEmailEvidence,
 } from '../api/incidents';
-import type { AnalysisResult, CoordinatorPlanResponse, Incident, InvestigatorReportResponse } from '../api/types';
+import type {
+  AnalysisResult,
+  AgenticWorkflowResultResponse,
+  CoordinatorPlanResponse,
+  Incident,
+  InvestigatorReportResponse,
+  ResponseAction,
+  ResponseEducationPackageResponse,
+} from '../api/types';
 import { EmailSummary } from '../components/EmailSummary';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { IndicatorsList } from '../components/IndicatorsList';
@@ -20,6 +32,9 @@ import { MitreMappings } from '../components/MitreMappings';
 import { RiskBadge } from '../components/RiskBadge';
 import { StatusBadge } from '../components/StatusBadge';
 import { UrlTable } from '../components/UrlTable';
+import { IncidentOverviewCharts } from '../components/IncidentOverviewCharts';
+import { WorkflowTimeline } from '../components/WorkflowTimeline';
+import { IncidentWorkspaceNav } from '../components/IncidentWorkspaceNav';
 
 const MAX_UPLOAD_SIZE_BYTES = 2_097_152;
 
@@ -76,23 +91,129 @@ function renderInvestigatorStatus(
   }
 }
 
+function renderResponseStatus(
+  status: ResponseEducationPackageResponse['status'] | 'NotStarted',
+  isGenerating: boolean,
+): string {
+  if (isGenerating) {
+    return 'Generating';
+  }
+
+  switch (status) {
+    case 'Completed':
+      return 'Completed';
+    case 'Failed':
+      return 'Failed';
+    case 'Running':
+      return 'Generating';
+    default:
+      return 'Not started';
+  }
+}
+
+function renderActionType(actionType: ResponseAction['actionType']): string {
+  switch (actionType) {
+    case 'UserAction':
+      return 'User Action';
+    case 'AdministratorAction':
+      return 'Administrator Action';
+    case 'ProfessionalEscalation':
+      return 'Professional Escalation';
+    default:
+      return 'Informational';
+  }
+}
+
 export function IncidentPage() {
   const { id } = useParams<{ id: string }>();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [coordinatorPlan, setCoordinatorPlan] = useState<CoordinatorPlanResponse | null>(null);
   const [investigatorReport, setInvestigatorReport] = useState<InvestigatorReportResponse | null>(null);
+  const [responsePackage, setResponsePackage] = useState<ResponseEducationPackageResponse | null>(null);
+  const [workflow, setWorkflow] = useState<AgenticWorkflowResultResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [coordinatorError, setCoordinatorError] = useState<string | null>(null);
   const [investigatorError, setInvestigatorError] = useState<string | null>(null);
+  const [responseError, setResponseError] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [runningInvestigator, setRunningInvestigator] = useState(false);
+  const [generatingResponsePackage, setGeneratingResponsePackage] = useState(false);
+  const [runningWorkflow, setRunningWorkflow] = useState(false);
+  const [selectedQuizAnswers, setSelectedQuizAnswers] = useState<Record<string, number>>({});
+  const [submittedQuizAnswers, setSubmittedQuizAnswers] = useState<Record<string, boolean>>({});
 
   const hasEvidence = useMemo(() => (incident?.evidenceItems.length ?? 0) > 0, [incident]);
+  const incidentRiskLabel = analysis?.riskLevel ?? 'Unknown';
+  const findingsCount = investigatorReport?.report?.findings.length ?? 0;
+  const responseActionsCount = responsePackage?.package
+    ? responsePackage.package.immediateActions.length
+      + responsePackage.package.recoveryActions.length
+      + responsePackage.package.preventionActions.length
+    : 0;
+
+  const workflowCompletion = useMemo(() => {
+    if (!workflow) {
+      return 0;
+    }
+
+    const completedCount = workflow.stages.filter((stage) => stage.status === 'Completed').length;
+    return Math.round((completedCount / workflow.stages.length) * 100);
+  }, [workflow]);
+
+  const stageSnapshot = useMemo(() => {
+    return [
+      {
+        label: 'Deterministic Analysis',
+        status: workflow?.stages.find((stage) => stage.stage === 'DeterministicAnalysis')?.status ?? 'Pending',
+      },
+      {
+        label: 'Coordinator',
+        status: workflow?.stages.find((stage) => stage.stage === 'Coordinator')?.status ?? 'Pending',
+      },
+      {
+        label: 'Investigator',
+        status: workflow?.stages.find((stage) => stage.stage === 'Investigator')?.status ?? 'Pending',
+      },
+      {
+        label: 'Response & Learning',
+        status: workflow?.stages.find((stage) => stage.stage === 'ResponseEducation')?.status ?? 'Pending',
+      },
+    ];
+  }, [workflow]);
+
+  const nextActionText = useMemo(() => {
+    if (!hasEvidence) {
+      return 'Upload at least one .eml evidence file to unlock analysis and workflow actions.';
+    }
+
+    if (!analysis) {
+      return 'Run deterministic analysis to extract phishing indicators and risk signals.';
+    }
+
+    if (!coordinatorPlan?.plan || coordinatorPlan.status !== 'Completed') {
+      return 'Generate an investigation plan to sequence the next deterministic tasks.';
+    }
+
+    if (!coordinatorPlan.plan.readyForInvestigation) {
+      return 'Coordinator is waiting for required missing information before investigation can continue.';
+    }
+
+    if (!investigatorReport?.report || investigatorReport.status !== 'Completed') {
+      return 'Run Investigator to synthesize evidence-backed findings.';
+    }
+
+    if (!responsePackage?.package || responsePackage.status !== 'Completed') {
+      return 'Generate Response & Learning to produce action steps and staff guidance.';
+    }
+
+    return 'Workflow is complete. Review findings, action lists, and learning questions below.';
+  }, [analysis, coordinatorPlan, hasEvidence, investigatorReport, responsePackage]);
 
   useEffect(() => {
     if (!id) {
@@ -109,6 +230,8 @@ export function IncidentPage() {
       setError(null);
       setCoordinatorError(null);
       setInvestigatorError(null);
+      setResponseError(null);
+      setWorkflowError(null);
 
       try {
         const loadedIncident = await getIncident(incidentId);
@@ -151,6 +274,36 @@ export function IncidentPage() {
               setInvestigatorReport(null);
             } else {
               setInvestigatorError(reportError instanceof Error ? reportError.message : 'Failed to load investigator report.');
+            }
+          }
+        }
+
+        try {
+          const loadedPackage = await getResponseEducationPackage(incidentId);
+          if (!disposed) {
+            setResponsePackage(loadedPackage);
+          }
+        } catch (packageError) {
+          if (!disposed) {
+            if (packageError instanceof Error && 'status' in packageError && (packageError as { status?: number }).status === 404) {
+              setResponsePackage(null);
+            } else {
+              setResponseError(packageError instanceof Error ? packageError.message : 'Failed to load response and learning package.');
+            }
+          }
+        }
+
+        try {
+          const loadedWorkflow = await getWorkflow(incidentId);
+          if (!disposed) {
+            setWorkflow(loadedWorkflow);
+          }
+        } catch (workflowLoadError) {
+          if (!disposed) {
+            if (workflowLoadError instanceof Error && 'status' in workflowLoadError && (workflowLoadError as { status?: number }).status === 404) {
+              setWorkflow(null);
+            } else {
+              setWorkflowError(workflowLoadError instanceof Error ? workflowLoadError.message : 'Failed to load workflow status.');
             }
           }
         }
@@ -211,8 +364,14 @@ export function IncidentPage() {
       setAnalysis(null);
       setCoordinatorPlan(null);
       setInvestigatorReport(null);
+      setResponsePackage(null);
+      setWorkflow(null);
       setCoordinatorError(null);
       setInvestigatorError(null);
+      setResponseError(null);
+      setWorkflowError(null);
+      setSelectedQuizAnswers({});
+      setSubmittedQuizAnswers({});
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Upload failed.');
     } finally {
@@ -235,8 +394,14 @@ export function IncidentPage() {
       setAnalysis(nextAnalysis);
       setCoordinatorPlan(null);
       setInvestigatorReport(null);
+      setResponsePackage(null);
+      setWorkflow(null);
       setCoordinatorError(null);
       setInvestigatorError(null);
+      setResponseError(null);
+      setWorkflowError(null);
+      setSelectedQuizAnswers({});
+      setSubmittedQuizAnswers({});
     } catch (analyzeError) {
       setError(analyzeError instanceof Error ? analyzeError.message : 'Analysis failed.');
     } finally {
@@ -256,7 +421,13 @@ export function IncidentPage() {
       const nextPlan = await generateCoordinatorPlan(id);
       setCoordinatorPlan(nextPlan);
       setInvestigatorReport(null);
+      setResponsePackage(null);
+      setWorkflow(null);
       setInvestigatorError(null);
+      setResponseError(null);
+      setWorkflowError(null);
+      setSelectedQuizAnswers({});
+      setSubmittedQuizAnswers({});
     } catch (planError) {
       setCoordinatorError(planError instanceof Error ? planError.message : 'Plan generation failed.');
     } finally {
@@ -275,10 +446,99 @@ export function IncidentPage() {
     try {
       const nextReport = await runInvestigator(id);
       setInvestigatorReport(nextReport);
+      setResponsePackage(null);
+      setWorkflow(null);
+      setResponseError(null);
+      setWorkflowError(null);
+      setSelectedQuizAnswers({});
+      setSubmittedQuizAnswers({});
     } catch (runError) {
       setInvestigatorError(runError instanceof Error ? runError.message : 'Investigator run failed.');
     } finally {
       setRunningInvestigator(false);
+    }
+  }
+
+  async function handleGenerateResponsePackage(): Promise<void> {
+    if (!id) {
+      return;
+    }
+
+    setGeneratingResponsePackage(true);
+    setResponseError(null);
+
+    try {
+      const nextPackage = await generateResponseEducationPackage(id);
+      setResponsePackage(nextPackage);
+      setWorkflow(null);
+      setSelectedQuizAnswers({});
+      setSubmittedQuizAnswers({});
+    } catch (packageError) {
+      setResponseError(packageError instanceof Error ? packageError.message : 'Response and learning generation failed.');
+    } finally {
+      setGeneratingResponsePackage(false);
+    }
+  }
+
+  function handleQuizSelection(questionId: string, optionIndex: number): void {
+    setSelectedQuizAnswers((current) => ({
+      ...current,
+      [questionId]: optionIndex,
+    }));
+  }
+
+  function handleQuizSubmit(questionId: string): void {
+    setSubmittedQuizAnswers((current) => ({
+      ...current,
+      [questionId]: true,
+    }));
+  }
+
+  async function handleRunWorkflow(): Promise<void> {
+    if (!id) {
+      return;
+    }
+
+    setRunningWorkflow(true);
+    setWorkflowError(null);
+
+    try {
+      const nextWorkflow = await runFullWorkflow(id);
+      setWorkflow(nextWorkflow);
+
+      const refreshedIncident = await getIncident(id);
+      setIncident(refreshedIncident);
+
+      try {
+        setAnalysis(await getIncidentAnalysis(id));
+      } catch {
+        setAnalysis(null);
+      }
+
+      try {
+        setCoordinatorPlan(await getCoordinatorPlan(id));
+      } catch {
+        setCoordinatorPlan(null);
+      }
+
+      try {
+        setInvestigatorReport(await getInvestigatorReport(id));
+      } catch {
+        setInvestigatorReport(null);
+      }
+
+      try {
+        setResponsePackage(await getResponseEducationPackage(id));
+      } catch {
+        setResponsePackage(null);
+      }
+
+      setSelectedQuizAnswers({});
+      setSubmittedQuizAnswers({});
+    } catch (workflowRunError) {
+      setWorkflowError(workflowRunError instanceof Error ? workflowRunError.message : 'Workflow run failed.');
+    } finally {
+      setRunningWorkflow(false);
     }
   }
 
@@ -308,6 +568,8 @@ export function IncidentPage() {
 
   return (
     <section className="space-stack">
+      <IncidentWorkspaceNav incidentId={incident.id} />
+
       <article className="card">
         <h1>Incident {incident.id}</h1>
         <div className="row-between wrap-gap">
@@ -337,6 +599,76 @@ export function IncidentPage() {
           </div>
         </dl>
       </article>
+
+      <article className="card mission-strip">
+        <div className="mission-strip-header">
+          <h2>What Happens Next</h2>
+          <p>{nextActionText}</p>
+        </div>
+        <div className="mission-metrics">
+          <div className="metric-tile">
+            <span className="metric-label">Evidence Files</span>
+            <strong className="metric-value">{incident.evidenceItems.length}</strong>
+          </div>
+          <div className="metric-tile">
+            <span className="metric-label">Current Risk</span>
+            <strong className="metric-value">{incidentRiskLabel}</strong>
+          </div>
+          <div className="metric-tile">
+            <span className="metric-label">Workflow Completion</span>
+            <strong className="metric-value">{workflowCompletion}%</strong>
+          </div>
+          <div className="metric-tile">
+            <span className="metric-label">Investigator Findings</span>
+            <strong className="metric-value">{findingsCount}</strong>
+          </div>
+          <div className="metric-tile">
+            <span className="metric-label">Response Actions</span>
+            <strong className="metric-value">{responseActionsCount}</strong>
+          </div>
+        </div>
+      </article>
+
+      <article className="card pulse-board">
+        <div className="row-between wrap-gap">
+          <h2>Case Pulse</h2>
+          <span className="soft-label">Fast status scan</span>
+        </div>
+        <div className="pulse-grid">
+          {stageSnapshot.map((stage) => (
+            <div key={stage.label} className={`pulse-tile pulse-${stage.status.toLowerCase()}`}>
+              <span className="pulse-label">{stage.label}</span>
+              <strong className="pulse-value">{stage.status}</strong>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <IncidentOverviewCharts
+        analysis={analysis}
+        workflow={workflow}
+        investigatorReport={investigatorReport}
+        responsePackage={responsePackage}
+      />
+
+      <article className="card space-stack">
+        <h2>Run Full ARGUS Workflow</h2>
+        <p>
+          This orchestration layer reuses deterministic analysis, Coordinator, Investigator, and Response &amp; Learning in a controlled workflow.
+        </p>
+        <button
+          type="button"
+          className="button-primary"
+          disabled={runningWorkflow || !hasEvidence}
+          onClick={() => void handleRunWorkflow()}
+        >
+          {runningWorkflow ? 'Running Full ARGUS Workflow...' : 'Run Full ARGUS Workflow'}
+        </button>
+        {!hasEvidence ? <p>Upload at least one .eml file before running the full workflow.</p> : null}
+        {workflowError ? <ErrorBanner message={workflowError} /> : null}
+      </article>
+
+      {workflow ? <WorkflowTimeline workflow={workflow} /> : null}
 
       <article className="card space-stack">
         <h2>Email Evidence Upload</h2>
@@ -413,9 +745,7 @@ export function IncidentPage() {
 
       <article className="card space-stack">
         <h2>Investigation Plan</h2>
-        <p>
-          The coordinator uses deterministic findings and incident context to propose the smallest useful investigation plan.
-        </p>
+        <p>Coordinator builds a prioritized plan from deterministic evidence.</p>
         <div className="row-between wrap-gap">
           <span>Coordinator status: {renderCoordinatorStatus(coordinatorPlan?.status ?? 'NotStarted', generatingPlan)}</span>
           {coordinatorPlan?.completedAt ? <span>Plan generated at {renderDate(coordinatorPlan.completedAt)}</span> : null}
@@ -440,30 +770,26 @@ export function IncidentPage() {
 
         {coordinatorPlan?.plan ? (
           <>
-            <div className="card-inner">
+            <section className="card-inner">
               <h3>Investigation Tasks</h3>
-              <ol className="investigation-list">
+              <ol className="visual-list">
                 {[...coordinatorPlan.plan.tasks]
                   .sort((left, right) => left.priority - right.priority)
                   .map((task) => (
-                    <li key={task.id}>
+                    <li key={task.id} className="visual-item">
                       <strong>{task.title}</strong>
                       <p>{task.description}</p>
-                      <p>
-                        <strong>Priority:</strong> {task.priority}
-                      </p>
-                      <p>
-                        <strong>Required Evidence:</strong> {task.requiredEvidence.length > 0 ? task.requiredEvidence.join(', ') : 'None'}
-                      </p>
-                      <p>
-                        <strong>Completion Condition:</strong> {task.completionCondition}
-                      </p>
+                      <div className="meta-chip-row">
+                        <span className="meta-chip">Priority {task.priority}</span>
+                        <span className="meta-chip">Evidence: {task.requiredEvidence.length > 0 ? task.requiredEvidence.join(', ') : 'None'}</span>
+                      </div>
+                      <p><strong>Done when:</strong> {task.completionCondition}</p>
                     </li>
                   ))}
               </ol>
-            </div>
+            </section>
 
-            <div className="card-inner">
+            <section className="card-inner">
               <h3>Missing Information</h3>
               {coordinatorPlan.plan.missingInformation.length === 0 ? (
                 <p>No missing information identified.</p>
@@ -478,7 +804,7 @@ export function IncidentPage() {
                   ))}
                 </ul>
               )}
-            </div>
+            </section>
 
             {coordinatorPlan.plan.assumptions.length > 0 ? (
               <div className="card-inner">
@@ -507,9 +833,7 @@ export function IncidentPage() {
 
       <article className="card space-stack">
         <h2>Investigation Findings</h2>
-        <p>
-          The investigator executes only deterministic tools against coordinator tasks and synthesizes an evidence-grounded report.
-        </p>
+        <p>Evidence-grounded synthesis from deterministic outputs.</p>
         <div className="row-between wrap-gap">
           <span>
             Investigator status: {renderInvestigatorStatus(investigatorReport?.status ?? 'NotStarted', runningInvestigator)}
@@ -539,33 +863,28 @@ export function IncidentPage() {
           <>
             <div className="card-inner">
               <h3>Report Summary</h3>
-              <p>
-                <strong>Classification:</strong> {investigatorReport.report.classification}
-              </p>
-              <p>
-                <strong>Severity:</strong> {investigatorReport.report.severity}
-              </p>
-              <p>
-                <strong>Confidence:</strong> {Math.round(investigatorReport.report.confidence * 100)}%
-              </p>
+              <div className="meta-chip-row">
+                <span className="meta-chip">{investigatorReport.report.classification}</span>
+                <span className="meta-chip">Severity: {investigatorReport.report.severity}</span>
+                <span className="meta-chip">Confidence: {Math.round(investigatorReport.report.confidence * 100)}%</span>
+              </div>
             </div>
 
-            <div className="card-inner">
+            <section className="card-inner">
               <h3>Findings</h3>
               {investigatorReport.report.findings.length === 0 ? (
                 <p>No findings reported.</p>
               ) : (
-                <ol className="investigation-list">
+                <ol className="visual-list">
                   {investigatorReport.report.findings.map((finding) => (
-                    <li key={finding.id}>
+                    <li key={finding.id} className="visual-item">
                       <strong>{finding.title}</strong>
                       <p>{finding.description}</p>
-                      <p>
-                        <strong>Severity:</strong> {finding.severity} | <strong>Confidence:</strong> {Math.round(finding.confidence * 100)}%
-                      </p>
-                      <p>
-                        <strong>Evidence Source:</strong> {finding.evidenceSource}
-                      </p>
+                      <div className="meta-chip-row">
+                        <span className="meta-chip">{finding.severity}</span>
+                        <span className="meta-chip">Confidence {Math.round(finding.confidence * 100)}%</span>
+                        <span className="meta-chip">Source: {finding.evidenceSource}</span>
+                      </div>
                       <p className="mono-text">
                         <strong>Evidence Ref:</strong> {finding.evidenceReference}
                       </p>
@@ -579,32 +898,28 @@ export function IncidentPage() {
                   ))}
                 </ol>
               )}
-            </div>
+            </section>
 
-            <div className="card-inner">
+            <section className="card-inner">
               <h3>Task Execution Results</h3>
               {investigatorReport.report.taskResults.length === 0 ? (
                 <p>No task execution results were recorded.</p>
               ) : (
-                <ul className="missing-info-list">
+                <ul className="visual-list">
                   {investigatorReport.report.taskResults.map((result) => (
-                    <li key={result.taskId}>
+                    <li key={result.taskId} className="visual-item">
                       <strong>{result.taskId}</strong>
-                      <p>
-                        <strong>Type:</strong> {result.taskType}
-                      </p>
-                      <p>
-                        <strong>Status:</strong> {result.status}
-                      </p>
-                      <p>
-                        <strong>Tools:</strong> {result.toolsUsed.length > 0 ? result.toolsUsed.join(', ') : 'None'}
-                      </p>
+                      <div className="meta-chip-row">
+                        <span className="meta-chip">{result.taskType}</span>
+                        <span className="meta-chip">{result.status}</span>
+                        <span className="meta-chip">Tools: {result.toolsUsed.length > 0 ? result.toolsUsed.join(', ') : 'None'}</span>
+                      </div>
                       <p>{result.summary}</p>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
+            </section>
 
             {investigatorReport.report.attackTechniques.length > 0 ? (
               <div className="card-inner">
@@ -637,6 +952,254 @@ export function IncidentPage() {
                 <ul>
                   {investigatorReport.report.uncertainties.map((item) => (
                     <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        ) : null}
+      </article>
+
+      <article className="card space-stack">
+        <h2>Response &amp; Learning</h2>
+        <p>Action plan and training generated from validated findings.</p>
+        <div className="row-between wrap-gap">
+          <span>
+            Response &amp; Learning status: {renderResponseStatus(responsePackage?.status ?? 'NotStarted', generatingResponsePackage)}
+          </span>
+          {responsePackage?.completedAt ? <span>Completed at {renderDate(responsePackage.completedAt)}</span> : null}
+        </div>
+        <button
+          type="button"
+          className="button-primary"
+          disabled={generatingResponsePackage || !investigatorReport?.report || investigatorReport.status !== 'Completed'}
+          onClick={() => void handleGenerateResponsePackage()}
+        >
+          {generatingResponsePackage ? 'Generating Response & Learning Plan...' : 'Generate Response & Learning Plan'}
+        </button>
+        {!investigatorReport?.report ? <p>Run investigator before generating response and learning guidance.</p> : null}
+        {responseError ? <ErrorBanner message={responseError} /> : null}
+
+        {responsePackage?.package ? (
+          <>
+            <div className="card-inner">
+              <h3>What ARGUS Found</h3>
+              <p>{responsePackage.package.plainLanguageSummary}</p>
+              <p>
+                <strong>Classification:</strong> {responsePackage.package.incidentClassification}
+              </p>
+              <p>
+                <strong>Overall Priority:</strong> {responsePackage.package.overallPriority}
+              </p>
+            </div>
+
+            <section className="card-inner">
+              <h3>Immediate Actions</h3>
+              {responsePackage.package.immediateActions.length === 0 ? (
+                <p>No immediate actions were recommended.</p>
+              ) : (
+                <ol className="visual-list">
+                  {responsePackage.package.immediateActions
+                    .slice()
+                    .sort((left, right) => left.priority - right.priority)
+                    .map((action) => (
+                      <li key={action.id} className="visual-item">
+                        <strong>{action.title}</strong>
+                        <p>{action.description}</p>
+                        <div className="meta-chip-row">
+                          <span className="meta-chip">Priority {action.priority}</span>
+                          <span className="meta-chip">{renderActionType(action.actionType)}</span>
+                          <span className="meta-chip">Approval: {action.requiresHumanApproval ? 'Yes' : 'No'}</span>
+                        </div>
+                        <p>
+                          <strong>Why:</strong> {action.reason}
+                        </p>
+                        {action.responsibleRole ? (
+                          <p>
+                            <strong>Responsible Role:</strong> {action.responsibleRole}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                </ol>
+              )}
+            </section>
+
+            <section className="card-inner">
+              <h3>Recovery Actions</h3>
+              {responsePackage.package.recoveryActions.length === 0 ? (
+                <p>No recovery actions were recommended.</p>
+              ) : (
+                <ol className="visual-list">
+                  {responsePackage.package.recoveryActions
+                    .slice()
+                    .sort((left, right) => left.priority - right.priority)
+                    .map((action) => (
+                      <li key={action.id} className="visual-item">
+                        <strong>{action.title}</strong>
+                        <p>{action.description}</p>
+                        <div className="meta-chip-row">
+                          <span className="meta-chip">Priority {action.priority}</span>
+                          <span className="meta-chip">{renderActionType(action.actionType)}</span>
+                          <span className="meta-chip">Approval: {action.requiresHumanApproval ? 'Yes' : 'No'}</span>
+                        </div>
+                        <p>
+                          <strong>Why:</strong> {action.reason}
+                        </p>
+                      </li>
+                    ))}
+                </ol>
+              )}
+            </section>
+
+            <section className="card-inner">
+              <h3>Prevention Actions</h3>
+              {responsePackage.package.preventionActions.length === 0 ? (
+                <p>No prevention actions were recommended.</p>
+              ) : (
+                <ol className="visual-list">
+                  {responsePackage.package.preventionActions
+                    .slice()
+                    .sort((left, right) => left.priority - right.priority)
+                    .map((action) => (
+                      <li key={action.id} className="visual-item">
+                        <strong>{action.title}</strong>
+                        <p>{action.description}</p>
+                        <div className="meta-chip-row">
+                          <span className="meta-chip">Priority {action.priority}</span>
+                          <span className="meta-chip">{renderActionType(action.actionType)}</span>
+                          <span className="meta-chip">Approval: {action.requiresHumanApproval ? 'Yes' : 'No'}</span>
+                        </div>
+                        <p>
+                          <strong>Why:</strong> {action.reason}
+                        </p>
+                      </li>
+                    ))}
+                </ol>
+              )}
+            </section>
+
+            <div className="card-inner">
+              <h3>When to get additional help</h3>
+              {responsePackage.package.escalationRecommendations.length === 0 ? (
+                <p>No escalation guidance was recommended.</p>
+              ) : (
+                <ul className="missing-info-list">
+                  {responsePackage.package.escalationRecommendations.map((recommendation) => (
+                    <li key={`${recommendation.level}-${recommendation.recommendedContact}`}>
+                      <strong>{recommendation.level}</strong>
+                      <p>{recommendation.reason}</p>
+                      <p>
+                        <strong>Recommended Contact:</strong> {recommendation.recommendedContact}
+                      </p>
+                      <p>
+                        <strong>Urgent:</strong> {recommendation.urgent ? 'Yes' : 'No'}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="card-inner">
+              <h3>Learn From This Incident</h3>
+              <p>
+                <strong>{responsePackage.package.education.title}</strong>
+              </p>
+              <p>
+                <strong>Learning Objective:</strong> {responsePackage.package.education.learningObjective}
+              </p>
+              <p>
+                <strong>Audience Level:</strong> {responsePackage.package.education.audienceLevel}
+              </p>
+              <p>
+                <strong>Estimated Time:</strong> {responsePackage.package.education.estimatedMinutes} minutes
+              </p>
+              <p>{responsePackage.package.education.explanation}</p>
+
+              <h4>Warning Signs</h4>
+              <ul className="missing-info-list">
+                {responsePackage.package.education.warningSigns.map((warningSign) => (
+                  <li key={warningSign.title}>
+                    <strong>{warningSign.title}</strong>
+                    <p>{warningSign.explanation}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <h4>Questions</h4>
+              <div className="space-stack">
+                {responsePackage.package.education.questions.map((question) => {
+                  const selectedAnswer = selectedQuizAnswers[question.id];
+                  const wasSubmitted = submittedQuizAnswers[question.id] ?? false;
+                  const isCorrect = wasSubmitted && selectedAnswer === question.correctOptionIndex;
+
+                  return (
+                    <fieldset key={question.id} className="card-inner">
+                      <legend>
+                        <strong>{question.question}</strong>
+                      </legend>
+                      <div className="space-stack">
+                        {question.options.map((option, optionIndex) => (
+                          <label key={`${question.id}-${optionIndex}`}>
+                            <input
+                              type="radio"
+                              name={question.id}
+                              value={optionIndex}
+                              checked={selectedAnswer === optionIndex}
+                              onChange={() => handleQuizSelection(question.id, optionIndex)}
+                            />{' '}
+                            {option}
+                          </label>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="button-primary"
+                        disabled={selectedAnswer === undefined}
+                        onClick={() => handleQuizSubmit(question.id)}
+                      >
+                        Check Answer
+                      </button>
+                      {wasSubmitted ? (
+                        <p>
+                          <strong>{isCorrect ? 'Correct.' : 'Incorrect.'}</strong> {question.explanation}
+                        </p>
+                      ) : null}
+                    </fieldset>
+                  );
+                })}
+              </div>
+
+              {responsePackage.package.education.takeaways.length > 0 ? (
+                <>
+                  <h4>Key Takeaways</h4>
+                  <ul>
+                    {responsePackage.package.education.takeaways.map((takeaway) => (
+                      <li key={takeaway}>{takeaway}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+
+            {responsePackage.package.assumptions.length > 0 ? (
+              <div className="card-inner">
+                <h3>Assumptions</h3>
+                <ul>
+                  {responsePackage.package.assumptions.map((assumption) => (
+                    <li key={assumption}>{assumption}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {responsePackage.package.limitations.length > 0 ? (
+              <div className="card-inner">
+                <h3>Limitations</h3>
+                <ul>
+                  {responsePackage.package.limitations.map((limitation) => (
+                    <li key={limitation}>{limitation}</li>
                   ))}
                 </ul>
               </div>

@@ -86,7 +86,7 @@ public sealed class InvestigatorServiceTests
     }
 
     [Fact]
-    public async Task RunAsync_WithUnknownEvidenceReference_ThrowsValidationAndMarksFailedRun()
+    public async Task RunAsync_WithUnknownEvidenceReference_NormalizesReportAndCompletesRun()
     {
         var llmClient = new RecordingLlmClient(request => new LlmResponse(
             "test-model",
@@ -117,13 +117,15 @@ public sealed class InvestigatorServiceTests
         var incidentId = await SeedIncidentAnalysisAndCoordinatorPlanAsync(dbContext, includeUnsupportedTask: false);
         var service = CreateService(dbContext, llmClient);
 
-        var exception = await Assert.ThrowsAsync<InvestigatorValidationException>(() => service.RunAsync(incidentId, CancellationToken.None));
+        var result = await service.RunAsync(incidentId, CancellationToken.None);
 
-        Assert.Contains(exception.ValidationErrors, message => message.Contains("unknown evidence", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(result.Report);
+        var finding = Assert.Single(result.Report.Findings);
+        Assert.Equal("auth:spf", finding.EvidenceReference);
 
         var storedRun = await dbContext.Set<InvestigatorRun>().SingleAsync(run => run.IncidentId == incidentId);
-        Assert.Equal(InvestigatorRunStatus.Failed, storedRun.Status);
-        Assert.Null(storedRun.OutputJson);
+        Assert.Equal(InvestigatorRunStatus.Completed, storedRun.Status);
+        Assert.False(string.IsNullOrWhiteSpace(storedRun.OutputJson));
     }
 
     private static InvestigatorService CreateService(ArgusDbContext dbContext, ILlmClient llmClient)

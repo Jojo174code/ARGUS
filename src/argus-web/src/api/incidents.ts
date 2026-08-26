@@ -1,11 +1,15 @@
 import { apiFetch } from './client';
 import type {
   AnalysisResult,
+  AgenticWorkflowResultResponse,
   CoordinatorPlanResponse,
   CreateIncidentRequest,
   EvidenceItem,
   Incident,
   InvestigatorReportResponse,
+  ResponseEducationPackageResponse,
+  EducationChatRequest,
+  EducationChatResponse,
 } from './types';
 
 export function createIncident(request: CreateIncidentRequest): Promise<Incident> {
@@ -60,4 +64,34 @@ export function runInvestigator(id: string): Promise<InvestigatorReportResponse>
 
 export function getInvestigatorReport(id: string): Promise<InvestigatorReportResponse> {
   return apiFetch<InvestigatorReportResponse>(`/api/incidents/${id}/investigator/report`);
+}
+
+export function generateResponseEducationPackage(id: string): Promise<ResponseEducationPackageResponse> {
+  return apiFetch<ResponseEducationPackageResponse>(`/api/incidents/${id}/response/generate`, {
+    method: 'POST',
+  });
+}
+
+export function getResponseEducationPackage(id: string): Promise<ResponseEducationPackageResponse> {
+  return apiFetch<ResponseEducationPackageResponse>(`/api/incidents/${id}/response`);
+}
+
+export function runFullWorkflow(id: string): Promise<AgenticWorkflowResultResponse> {
+  return apiFetch<AgenticWorkflowResultResponse>(`/api/incidents/${id}/workflow/run`, {
+    method: 'POST',
+  });
+}
+
+export function getWorkflow(id: string): Promise<AgenticWorkflowResultResponse> {
+  return apiFetch<AgenticWorkflowResultResponse>(`/api/incidents/${id}/workflow`);
+}
+
+export function chatEducationAssistant(id: string, request: EducationChatRequest): Promise<EducationChatResponse> {
+  return apiFetch<EducationChatResponse>(`/api/incidents/${id}/education/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
 }

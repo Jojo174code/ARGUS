@@ -110,6 +110,8 @@ public sealed class InvestigatorService : IInvestigatorService
                 synthesis.Uncertainties,
                 executionResults.Select(result => result.Result).ToList());
 
+            report = NormalizeEvidenceReferences(report);
+
             var evidenceReferences = executionResults
                 .SelectMany(result => result.Result.EvidenceReferences)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -341,5 +343,88 @@ public sealed class InvestigatorService : IInvestigatorService
             run.CompletedAt,
             run.ErrorMessage,
             report);
+    }
+
+    private static InvestigationReport NormalizeEvidenceReferences(InvestigationReport report)
+    {
+        var evidenceReferences = report.TaskResults
+            .SelectMany(task => task.EvidenceReferences)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var taskEvidenceReferences = report.TaskResults
+            .Where(task => !string.IsNullOrWhiteSpace(task.TaskId))
+            .ToDictionary(
+                task => task.TaskId,
+                task => task.EvidenceReferences
+                    .Where(reference => !string.IsNullOrWhiteSpace(reference))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                StringComparer.OrdinalIgnoreCase);
+
+        var normalizedFindings = report.Findings.Select(finding =>
+        {
+            var normalizedReference = ResolveEvidenceReference(
+                finding.EvidenceReference,
+                finding.TaskId,
+                evidenceReferences,
+                taskEvidenceReferences);
+
+            return string.Equals(normalizedReference, finding.EvidenceReference, StringComparison.Ordinal)
+                ? finding
+                : finding with { EvidenceReference = normalizedReference };
+        }).ToList();
+
+        return normalizedFindings.SequenceEqual(report.Findings)
+            ? report
+            : report with { Findings = normalizedFindings };
+    }
+
+    private static string ResolveEvidenceReference(
+        string evidenceReference,
+        string? taskId,
+        HashSet<string> knownEvidenceReferences,
+        Dictionary<string, List<string>> taskEvidenceReferences)
+    {
+        if (string.IsNullOrWhiteSpace(evidenceReference))
+        {
+            if (!string.IsNullOrWhiteSpace(taskId)
+                && taskEvidenceReferences.TryGetValue(taskId, out var taskReferences)
+                && taskReferences.Count > 0)
+            {
+                return taskReferences[0];
+            }
+
+            return evidenceReference;
+        }
+
+        if (knownEvidenceReferences.Contains(evidenceReference))
+        {
+            return evidenceReference;
+        }
+
+        if (taskEvidenceReferences.TryGetValue(evidenceReference, out var matchingTaskReferences)
+            && matchingTaskReferences.Count > 0)
+        {
+            return matchingTaskReferences[0];
+        }
+
+        foreach (var token in evidenceReference.Split([',', ';', '|', '\n', '\r', '\t', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (knownEvidenceReferences.Contains(token))
+            {
+                return token;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(taskId)
+            && taskEvidenceReferences.TryGetValue(taskId, out var referencesForTask)
+            && referencesForTask.Count > 0)
+        {
+            return referencesForTask[0];
+        }
+
+        return evidenceReference;
     }
 }

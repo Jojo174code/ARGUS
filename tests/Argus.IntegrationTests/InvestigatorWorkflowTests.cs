@@ -25,7 +25,7 @@ public sealed class InvestigatorWorkflowTests
         var runResponse = await httpClient.PostAsync($"/api/incidents/{incident.Id}/investigator/run", content: null);
         Assert.Equal(HttpStatusCode.OK, runResponse.StatusCode);
 
-        var generatedReport = await runResponse.Content.ReadFromJsonAsync<InvestigatorReportDto>();
+        var generatedReport = await runResponse.Content.ReadArgusJsonAsync<InvestigatorReportDto>();
         Assert.NotNull(generatedReport);
         Assert.Equal(incident.Id, generatedReport!.IncidentId);
         Assert.Equal("Completed", generatedReport.Status);
@@ -37,7 +37,7 @@ public sealed class InvestigatorWorkflowTests
         var getResponse = await httpClient.GetAsync($"/api/incidents/{incident.Id}/investigator/report");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
 
-        var storedReport = await getResponse.Content.ReadFromJsonAsync<InvestigatorReportDto>();
+        var storedReport = await getResponse.Content.ReadArgusJsonAsync<InvestigatorReportDto>();
         Assert.NotNull(storedReport);
         Assert.Equal(generatedReport.Status, storedReport!.Status);
         Assert.Equal(generatedReport.Report.Classification, storedReport.Report!.Classification);
@@ -62,7 +62,7 @@ public sealed class InvestigatorWorkflowTests
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var incident = await response.Content.ReadFromJsonAsync<IncidentDto>();
+        var incident = await response.Content.ReadArgusJsonAsync<IncidentDto>();
         Assert.NotNull(incident);
         return incident!;
     }

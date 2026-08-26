@@ -25,6 +25,12 @@ export type CoordinatorRunStatus = 'NotStarted' | 'Running' | 'Completed' | 'Fai
 
 export type InvestigatorRunStatus = 'NotStarted' | 'Running' | 'Completed' | 'Failed';
 
+export type ResponseEducationRunStatus = 'NotStarted' | 'Running' | 'Completed' | 'Failed';
+
+export type ResponseActionType = 'Informational' | 'UserAction' | 'AdministratorAction' | 'ProfessionalEscalation';
+
+export type EscalationLevel = 'None' | 'InternalIT' | 'ManagedServiceProvider' | 'CybersecurityProfessional' | 'LegalOrCompliance' | 'LawEnforcement';
+
 export type AuthCheckVerdict =
   | 'Unknown'
   | 'Pass'
@@ -143,6 +149,7 @@ export interface MissingInformationItem {
   question: string;
   reason: string;
   required: boolean;
+  blocksInvestigation: boolean;
 }
 
 export interface InvestigationPlan {
@@ -218,8 +225,127 @@ export interface InvestigatorReportResponse {
   report: InvestigationReport | null;
 }
 
+export interface ResponseAction {
+  id: string;
+  title: string;
+  description: string;
+  reason: string;
+  priority: number;
+  actionType: ResponseActionType;
+  requiresHumanApproval: boolean;
+  responsibleRole: string | null;
+  supportingFindingIds: string[];
+}
+
+export interface EscalationRecommendation {
+  level: EscalationLevel;
+  reason: string;
+  recommendedContact: string;
+  urgent: boolean;
+}
+
+export interface WarningSign {
+  title: string;
+  explanation: string;
+  supportingFindingIds: string[];
+}
+
+export interface EducationQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctOptionIndex: number;
+  explanation: string;
+}
+
+export interface EducationModule {
+  title: string;
+  audienceLevel: string;
+  estimatedMinutes: number;
+  learningObjective: string;
+  explanation: string;
+  warningSigns: WarningSign[];
+  questions: EducationQuestion[];
+  takeaways: string[];
+}
+
+export interface ResponseEducationPackage {
+  incidentId: string;
+  incidentClassification: string;
+  overallPriority: RiskLevel;
+  plainLanguageSummary: string;
+  immediateActions: ResponseAction[];
+  recoveryActions: ResponseAction[];
+  preventionActions: ResponseAction[];
+  escalationRecommendations: EscalationRecommendation[];
+  education: EducationModule;
+  assumptions: string[];
+  limitations: string[];
+}
+
+export interface ResponseEducationPackageResponse {
+  incidentId: string;
+  status: ResponseEducationRunStatus;
+  model: string;
+  promptVersion: string;
+  startedAt: string;
+  completedAt: string | null;
+  errorMessage: string | null;
+  package: ResponseEducationPackage | null;
+}
+
+export type WorkflowRunStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'AwaitingInformation';
+
+export interface WorkflowStageResult {
+  stage: string;
+  status: WorkflowRunStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  summary: string | null;
+  error: string | null;
+}
+
+export interface WorkflowSummaryMetrics {
+  coordinatorTaskCount: number;
+  investigatorFindingCount: number;
+  unsupportedTaskCount: number;
+  responseActionCount: number;
+  quizQuestionCount: number;
+  durationMilliseconds: number;
+}
+
+export interface AgenticWorkflowResultResponse {
+  incidentId: string;
+  workflowRunId: string;
+  status: WorkflowRunStatus;
+  stages: WorkflowStageResult[];
+  startedAt: string;
+  completedAt: string | null;
+  failureStage: string | null;
+  failureMessage: string | null;
+  blockingMissingInformation: MissingInformationItem[];
+  metrics: WorkflowSummaryMetrics;
+}
+
 export interface ValidationProblem {
   title?: string;
   detail?: string;
   errors?: Record<string, string[]>;
+}
+
+export interface EducationChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface EducationChatRequest {
+  question: string;
+  history: EducationChatMessage[];
+}
+
+export interface EducationChatResponse {
+  answer: string;
+  suggestedNextStep: string | null;
+  model: string;
+  generatedAt: string;
 }

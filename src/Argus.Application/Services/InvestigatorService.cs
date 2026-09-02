@@ -194,69 +194,72 @@ public sealed class InvestigatorService : IInvestigatorService
         InvestigationContext context,
         CancellationToken cancellationToken)
     {
-        var executions = new List<InvestigationTaskExecution>();
+        var executions = await Task.WhenAll(context.CoordinatorPlan.Tasks
+            .OrderBy(task => task.Priority)
+            .Select(task => ExecuteTaskAsync(context, task, cancellationToken)));
 
-        foreach (var task in context.CoordinatorPlan.Tasks.OrderBy(task => task.Priority))
+        return executions;
+    }
+
+    private async Task<InvestigationTaskExecution> ExecuteTaskAsync(
+        InvestigationContext context,
+        InvestigationTask task,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _logger.LogInformation("Task execution started for incident {IncidentId}: task {TaskId} ({TaskType})", context.IncidentId, task.Id, task.TaskType);
+
+        var matchingTools = _investigationTools.Where(tool => tool.CanExecute(task)).ToList();
+        if (matchingTools.Count == 0)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            _logger.LogInformation("Task execution started for incident {IncidentId}: task {TaskId} ({TaskType})", context.IncidentId, task.Id, task.TaskType);
-
-            var matchingTools = _investigationTools.Where(tool => tool.CanExecute(task)).ToList();
-            if (matchingTools.Count == 0)
-            {
-                _logger.LogInformation("Unsupported task encountered for incident {IncidentId}: task {TaskId} ({TaskType})", context.IncidentId, task.Id, task.TaskType);
-                executions.Add(new InvestigationTaskExecution(
-                    task,
-                    new TaskExecutionResult(
-                        task.Id,
-                        task.TaskType,
-                        InvestigationTaskExecutionStatus.Unsupported.ToString(),
-                        Array.Empty<string>(),
-                        Array.Empty<string>(),
-                        "No supported deterministic investigation tool is available for this task type."),
-                    Array.Empty<ToolResult>()));
-                continue;
-            }
-
-            var toolResults = new List<ToolResult>();
-            foreach (var tool in matchingTools)
-            {
-                var result = await tool.ExecuteAsync(context, task, cancellationToken);
-                toolResults.Add(result);
-                _logger.LogInformation(
-                    "Tool executed for incident {IncidentId}: task {TaskId}, tool {ToolName}, success {Success}",
-                    context.IncidentId,
-                    task.Id,
-                    result.ToolName,
-                    result.Success);
-            }
-
-            var taskStatus = toolResults.All(result => result.Success)
-                ? InvestigationTaskExecutionStatus.Completed
-                : InvestigationTaskExecutionStatus.Failed;
-
-            var evidenceReferences = toolResults.SelectMany(result => result.EvidenceReferences)
-                .Where(reference => !string.IsNullOrWhiteSpace(reference))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var summary = taskStatus == InvestigationTaskExecutionStatus.Completed
-                ? "Task completed using deterministic tools."
-                : "Task executed but one or more tool operations failed.";
-
-            executions.Add(new InvestigationTaskExecution(
+            _logger.LogInformation("Unsupported task encountered for incident {IncidentId}: task {TaskId} ({TaskType})", context.IncidentId, task.Id, task.TaskType);
+            return new InvestigationTaskExecution(
                 task,
                 new TaskExecutionResult(
                     task.Id,
                     task.TaskType,
-                    taskStatus.ToString(),
-                    toolResults.Select(result => result.ToolName).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-                    evidenceReferences,
-                    summary),
-                toolResults));
+                    InvestigationTaskExecutionStatus.Unsupported.ToString(),
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    "No supported deterministic investigation tool is available for this task type."),
+                Array.Empty<ToolResult>());
         }
 
-        return executions;
+        var toolResults = await Task.WhenAll(matchingTools.Select(async tool =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var result = await tool.ExecuteAsync(context, task, cancellationToken);
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Tool executed for incident {IncidentId}: task {TaskId}, tool {ToolName}, success {Success}, duration {ElapsedMs} ms",
+                context.IncidentId,
+                task.Id,
+                result.ToolName,
+                result.Success,
+                stopwatch.ElapsedMilliseconds);
+            return result;
+        }));
+
+        var taskStatus = toolResults.All(result => result.Success)
+            ? InvestigationTaskExecutionStatus.Completed
+            : InvestigationTaskExecutionStatus.Failed;
+        var evidenceReferences = toolResults.SelectMany(result => result.EvidenceReferences)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new InvestigationTaskExecution(
+            task,
+            new TaskExecutionResult(
+                task.Id,
+                task.TaskType,
+                taskStatus.ToString(),
+                toolResults.Select(result => result.ToolName).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                evidenceReferences,
+                taskStatus == InvestigationTaskExecutionStatus.Completed
+                    ? "Task completed using deterministic tools."
+                    : "Task executed but one or more tool operations failed."),
+            toolResults);
     }
 
     private async Task<(InvestigationReportSynthesis Synthesis, string Model)> GenerateValidatedSynthesisAsync(

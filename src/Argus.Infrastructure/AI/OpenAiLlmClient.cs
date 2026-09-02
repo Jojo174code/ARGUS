@@ -3,6 +3,7 @@ using Argus.Application.Models;
 using Argus.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 
@@ -26,13 +27,14 @@ public sealed class OpenAiLlmClient : ILlmClient
     public async Task<LlmResponse> GenerateAsync(LlmRequest request, CancellationToken cancellationToken)
     {
         EnsureConfigured();
+        var model = SelectModel(request.ResponseSchemaName);
 
         using var message = new HttpRequestMessage(HttpMethod.Post, "chat/completions");
         message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _options.ApiKey);
 
         var payload = new
         {
-            model = _options.Model,
+            model,
             response_format = new { type = "json_object" },
             messages = new object[]
             {
@@ -43,10 +45,18 @@ public sealed class OpenAiLlmClient : ILlmClient
 
         message.Content = new StringContent(JsonSerializer.Serialize(payload, SerializerOptions), Encoding.UTF8, "application/json");
 
-        _logger.LogInformation("Invoking OpenAI coordinator model {Model} for incident {IncidentId}", _options.Model, request.IncidentId);
+        _logger.LogInformation(
+            "Invoking ARGUS LLM for incident {IncidentId}, schema {SchemaName}, model {Model}, systemPromptChars {SystemPromptChars}, userPromptChars {UserPromptChars}",
+            request.IncidentId,
+            request.ResponseSchemaName,
+            model,
+            request.SystemPrompt.Length,
+            request.UserPrompt.Length);
 
+        var stopwatch = Stopwatch.StartNew();
         using var response = await _httpClient.SendAsync(message, cancellationToken);
         var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        stopwatch.Stop();
 
         if (!response.IsSuccessStatusCode)
         {
@@ -58,7 +68,7 @@ public sealed class OpenAiLlmClient : ILlmClient
 
         using var document = JsonDocument.Parse(responseContent);
         var root = document.RootElement;
-        var model = root.TryGetProperty("model", out var modelElement) ? modelElement.GetString() : _options.Model;
+        var responseModel = root.TryGetProperty("model", out var modelElement) ? modelElement.GetString() : model;
         var content = root.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
 
         if (string.IsNullOrWhiteSpace(content))
@@ -66,7 +76,15 @@ public sealed class OpenAiLlmClient : ILlmClient
             throw new HttpRequestException("OpenAI returned an empty coordinator response.");
         }
 
-        return new LlmResponse(model ?? _options.Model, NormalizeJsonContent(content));
+        var normalizedContent = NormalizeJsonContent(content);
+        _logger.LogInformation(
+            "ARGUS LLM completed for incident {IncidentId}, schema {SchemaName}, duration {ElapsedMs} ms, responseChars {ResponseChars}",
+            request.IncidentId,
+            request.ResponseSchemaName,
+            stopwatch.ElapsedMilliseconds,
+            normalizedContent.Length);
+
+        return new LlmResponse(responseModel ?? model, normalizedContent);
     }
 
     private void EnsureConfigured()
@@ -75,6 +93,19 @@ public sealed class OpenAiLlmClient : ILlmClient
         {
             throw new InvalidOperationException("Coordinator LLM provider is not configured. Set OPENAI_API_KEY or LITELLM_API_KEY, and OPENAI_MODEL or LITELLM_MODEL.");
         }
+    }
+
+    private string SelectModel(string schemaName)
+    {
+        var configuredModel = schemaName switch
+        {
+            "InvestigationPlan" => _options.CoordinatorModel,
+            "InvestigationReportSynthesis" => _options.InvestigatorModel,
+            "ResponseEducationPackage" => _options.ResponseModel,
+            _ => string.Empty
+        };
+
+        return string.IsNullOrWhiteSpace(configuredModel) ? _options.Model : configuredModel;
     }
 
     private static string NormalizeJsonContent(string content)

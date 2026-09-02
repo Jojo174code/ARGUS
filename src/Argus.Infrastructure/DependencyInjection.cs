@@ -68,6 +68,9 @@ public static class DependencyInjection
         {
             ApiKey = llmApiKey ?? string.Empty,
             Model = llmModel ?? string.Empty,
+            CoordinatorModel = Environment.GetEnvironmentVariable("ARGUS_COORDINATOR_MODEL") ?? string.Empty,
+            InvestigatorModel = Environment.GetEnvironmentVariable("ARGUS_INVESTIGATOR_MODEL") ?? string.Empty,
+            ResponseModel = Environment.GetEnvironmentVariable("ARGUS_RESPONSE_MODEL") ?? string.Empty,
             BaseUrl = normalizedLlmBaseUrl
         }));
 

@@ -4,12 +4,14 @@ using Argus.Domain.Entities;
 using Argus.Domain.Enums;
 using Argus.Domain.Models;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace Argus.Application.Services;
 
 public sealed class AgenticWorkflowService : IAgenticWorkflowService
 {
+    private static readonly ConcurrentDictionary<Guid, SemaphoreSlim> WorkflowLocks = new();
     private const string DeterministicAnalysisStage = "DeterministicAnalysis";
     private const string CoordinatorStage = "Coordinator";
     private const string InvestigatorStage = "Investigator";
@@ -54,12 +56,27 @@ public sealed class AgenticWorkflowService : IAgenticWorkflowService
 
     public async Task<AgenticWorkflowResultDto> RunAsync(Guid incidentId, CancellationToken cancellationToken)
     {
+        var workflowLock = WorkflowLocks.GetOrAdd(incidentId, _ => new SemaphoreSlim(1, 1));
+        await workflowLock.WaitAsync(cancellationToken);
+        try
+        {
+            return await RunCoreAsync(incidentId, cancellationToken);
+        }
+        finally
+        {
+            workflowLock.Release();
+        }
+    }
+
+    private async Task<AgenticWorkflowResultDto> RunCoreAsync(Guid incidentId, CancellationToken cancellationToken)
+    {
         var incident = await _incidentRepository.GetByIdAsync(incidentId, cancellationToken)
             ?? throw new KeyNotFoundException("Incident was not found.");
 
         var latestWorkflow = await _workflowRunRepository.GetLatestByIncidentIdAsync(incidentId, cancellationToken);
-        if (latestWorkflow is not null && latestWorkflow.Status == WorkflowRunStatus.Completed)
+        if (latestWorkflow is not null && (latestWorkflow.Status == WorkflowRunStatus.Completed || latestWorkflow.Status == WorkflowRunStatus.Running))
         {
+            _logger.LogInformation("Reusing {WorkflowStatus} workflow {WorkflowRunId} for incident {IncidentId}", latestWorkflow.Status, latestWorkflow.Id, incidentId);
             return ToDto(latestWorkflow);
         }
 

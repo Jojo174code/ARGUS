@@ -42,8 +42,8 @@ internal static class CoordinatorPromptBuilder
                     analysis.Email.Subject,
                     analysis.Email.Date?.ToString("O"),
                     analysis.Email.MessageId,
-                    analysis.Email.ReceivedHeaders.ToList(),
-                    analysis.Email.Authentication.AuthenticationResultsHeaders.ToList(),
+                    [],
+                    [],
                     analysis.Email.Urls.Select(url => new EmailUrlSnapshot(url.Url, url.DisplayText, url.Source)).ToList(),
                     analysis.Email.Attachments.Select(attachment => new AttachmentSnapshot(attachment.FileName, attachment.ContentType, attachment.Size)).ToList())),
             incident.EvidenceItems.Select(evidence => new EvidenceSnapshot(

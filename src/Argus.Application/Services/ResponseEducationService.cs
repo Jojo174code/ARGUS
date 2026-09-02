@@ -72,15 +72,13 @@ public sealed class ResponseEducationService : IResponseEducationService
         var investigatorReport = JsonSerializer.Deserialize<InvestigationReport>(investigatorRun.OutputJson, SerializerOptions)
             ?? throw new ResponseEducationPrerequisiteException("The persisted investigator report could not be loaded.");
 
-        var deterministicAnalysis = IncidentAnalysisMapper.Map(analysisEntity);
-        var coordinatorInput = CoordinatorPromptBuilder.BuildInput(incident, deterministicAnalysis);
         var responseInput = new ResponseEducationInput(
             incidentId,
-            coordinatorInput.Incident,
-            coordinatorInput.Findings,
-            investigatorReport,
-            coordinatorPlan.Assumptions,
-            coordinatorPlan.SafetyNotes);
+            incident.TechnicalSkillLevel.ToString(),
+            investigatorReport.Classification,
+            investigatorReport.Severity,
+            investigatorReport.Findings,
+            investigatorReport.Uncertainties);
 
         var inputJson = JsonSerializer.Serialize(responseInput, SerializerOptions);
         var run = new ResponseEducationRun(

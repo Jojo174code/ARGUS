@@ -4,8 +4,8 @@ namespace Argus.Application.Models;
 
 public sealed record ResponseEducationInput(
     Guid IncidentId,
-    IncidentContext Incident,
-    DeterministicFindings DeterministicFindings,
-    InvestigationReport InvestigatorReport,
-    IReadOnlyList<string> CoordinatorAssumptions,
-    IReadOnlyList<string> CoordinatorSafetyNotes);
+    string TechnicalSkillLevel,
+    string Classification,
+    string Severity,
+    IReadOnlyList<InvestigationFinding> Findings,
+    IReadOnlyList<string> Uncertainties);

@@ -5,9 +5,12 @@ import {
   chatEducationAssistant,
   generateResponseEducationPackage,
   getIncident,
+  getIncidentAnalysis,
+  getInvestigatorReport,
   getResponseEducationPackage,
 } from '../api/incidents';
-import type { EducationChatMessage, Incident, ResponseEducationPackageResponse } from '../api/types';
+import type { AnalysisResult, EducationChatMessage, Incident, InvestigatorReportResponse, ResponseEducationPackageResponse } from '../api/types';
+import { EducationExperience } from '../components/EducationExperience';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { IncidentWorkspaceNav } from '../components/IncidentWorkspaceNav';
 import { LoadingBlock } from '../components/LoadingBlock';
@@ -16,14 +19,14 @@ export function IncidentEducationPage() {
   const { id } = useParams<{ id: string }>();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [responsePack, setResponsePack] = useState<ResponseEducationPackageResponse | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [report, setReport] = useState<InvestigatorReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingEducation, setLoadingEducation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [chatBusy, setChatBusy] = useState(false);
-  const [selectedQuizAnswers, setSelectedQuizAnswers] = useState<Record<string, number>>({});
-  const [submittedQuizAnswers, setSubmittedQuizAnswers] = useState<Record<string, boolean>>({});
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const [chatHistory, setChatHistory] = useState<EducationChatMessage[]>([
     {
@@ -51,6 +54,8 @@ export function IncidentEducationPage() {
       setError(null);
       try {
         setIncident(await getIncident(incidentId));
+        getIncidentAnalysis(incidentId).then(setAnalysis).catch(() => setAnalysis(null));
+        getInvestigatorReport(incidentId).then(setReport).catch(() => setReport(null));
         try {
           setResponsePack(await getResponseEducationPackage(incidentId));
         } catch {
@@ -95,27 +100,11 @@ export function IncidentEducationPage() {
     try {
       const nextPackage = await generateResponseEducationPackage(id);
       setResponsePack(nextPackage);
-      setSelectedQuizAnswers({});
-      setSubmittedQuizAnswers({});
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : 'Failed to generate education package.');
     } finally {
       setLoadingEducation(false);
     }
-  }
-
-  function handleQuizSelection(questionId: string, optionIndex: number): void {
-    setSelectedQuizAnswers((current) => ({
-      ...current,
-      [questionId]: optionIndex,
-    }));
-  }
-
-  function handleQuizSubmit(questionId: string): void {
-    setSubmittedQuizAnswers((current) => ({
-      ...current,
-      [questionId]: true,
-    }));
   }
 
   async function sendQuestion(question: string): Promise<void> {
@@ -167,8 +156,6 @@ export function IncidentEducationPage() {
     );
   }
 
-  const education = responsePack?.package?.education;
-
   return (
     <section className="space-stack">
       <IncidentWorkspaceNav incidentId={incident.id} />
@@ -192,98 +179,7 @@ export function IncidentEducationPage() {
 
       {responsePack?.package ? (
         <div className="education-layout">
-          <article className="card space-stack">
-            <h2>Learning Snapshot</h2>
-            <p>{responsePack.package.plainLanguageSummary}</p>
-            <div className="meta-chip-row">
-              <span className="meta-chip">Priority: {responsePack.package.overallPriority}</span>
-              <span className="meta-chip">Classification: {responsePack.package.incidentClassification}</span>
-            </div>
-
-            {education ? (
-              <>
-                <div className="card-inner">
-                  <h3>{education.title}</h3>
-                  <p>{education.explanation}</p>
-                  <div className="meta-chip-row">
-                    <span className="meta-chip">Audience: {education.audienceLevel}</span>
-                    <span className="meta-chip">Time: {education.estimatedMinutes} min</span>
-                  </div>
-                </div>
-
-                <div className="card-inner">
-                  <h3>Warning Signs</h3>
-                  <ul className="visual-list">
-                    {education.warningSigns.map((sign) => (
-                      <li key={sign.title} className="visual-item">
-                        <strong>{sign.title}</strong>
-                        <p>{sign.explanation}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {education.takeaways.length > 0 ? (
-                  <div className="card-inner">
-                    <h3>Key Takeaways</h3>
-                    <ul className="visual-list">
-                      {education.takeaways.map((takeaway) => (
-                        <li key={takeaway} className="visual-item">{takeaway}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {education.questions.length > 0 ? (
-                  <div className="card-inner space-stack">
-                    <h3>Quick Knowledge Check</h3>
-                    <div className="quiz-grid">
-                      {education.questions.map((question) => {
-                        const selectedAnswer = selectedQuizAnswers[question.id];
-                        const wasSubmitted = submittedQuizAnswers[question.id] ?? false;
-                        const isCorrect = wasSubmitted && selectedAnswer === question.correctOptionIndex;
-
-                        return (
-                          <fieldset key={question.id} className="quiz-card">
-                            <legend>
-                              <strong>{question.question}</strong>
-                            </legend>
-                            <div className="quiz-options">
-                              {question.options.map((option, optionIndex) => (
-                                <label key={`${question.id}-${optionIndex}`} className="quiz-option">
-                                  <input
-                                    type="radio"
-                                    name={question.id}
-                                    value={optionIndex}
-                                    checked={selectedAnswer === optionIndex}
-                                    onChange={() => handleQuizSelection(question.id, optionIndex)}
-                                  />
-                                  <span>{option}</span>
-                                </label>
-                              ))}
-                            </div>
-                            <button
-                              type="button"
-                              className="button-primary"
-                              disabled={selectedAnswer === undefined}
-                              onClick={() => handleQuizSubmit(question.id)}
-                            >
-                              Check Answer
-                            </button>
-                            {wasSubmitted ? (
-                              <p className="quiz-feedback">
-                                <strong>{isCorrect ? 'Correct.' : 'Not quite.'}</strong> {question.explanation}
-                              </p>
-                            ) : null}
-                          </fieldset>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </article>
+          <EducationExperience incident={incident} responsePackage={responsePack.package} report={report?.report ?? null} analysis={analysis} />
 
           <article className="card space-stack chat-panel">
             <div className="chat-header">

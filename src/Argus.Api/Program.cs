@@ -1,4 +1,6 @@
 using Argus.Infrastructure;
+using Argus.Infrastructure.AI;
+using Argus.Infrastructure.Configuration;
 using Argus.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 
+DotEnvLoader.LoadRepositoryEnvironment(Directory.GetCurrentDirectory());
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
@@ -115,6 +118,15 @@ app.UseCors("ArgusClient");
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/api/development/openrouter/status", async (OpenRouterLlmClient client, CancellationToken cancellationToken) =>
+    {
+        var result = await client.CheckAuthenticationAsync(cancellationToken);
+        return Results.Ok(result);
+    });
+}
 
 app.Run();
 

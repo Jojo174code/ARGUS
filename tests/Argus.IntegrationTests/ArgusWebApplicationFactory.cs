@@ -16,6 +16,7 @@ public sealed class ArgusWebApplicationFactory : WebApplicationFactory<Program>
     private readonly string? _originalDatabaseName = Environment.GetEnvironmentVariable("Database__DatabaseName");
     private readonly string? _originalUploadRoot = Environment.GetEnvironmentVariable("Uploads__RootDirectory");
     private readonly string? _originalUploadMaxFileSize = Environment.GetEnvironmentVariable("Uploads__MaxFileSizeBytes");
+    private readonly string? _originalOpenRouterApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");
 
     public string UploadDirectory => _uploadDirectory;
 
@@ -28,6 +29,7 @@ public sealed class ArgusWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Database__DatabaseName", _databaseName);
         Environment.SetEnvironmentVariable("Uploads__RootDirectory", _uploadDirectory);
         Environment.SetEnvironmentVariable("Uploads__MaxFileSizeBytes", DefaultMaxUploadSizeBytes.ToString());
+        Environment.SetEnvironmentVariable("OPENROUTER_API_KEY", "sk-or-integration-test-key");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -47,6 +49,7 @@ public sealed class ArgusWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("Database__DatabaseName", _originalDatabaseName);
         Environment.SetEnvironmentVariable("Uploads__RootDirectory", _originalUploadRoot);
         Environment.SetEnvironmentVariable("Uploads__MaxFileSizeBytes", _originalUploadMaxFileSize);
+        Environment.SetEnvironmentVariable("OPENROUTER_API_KEY", _originalOpenRouterApiKey);
 
         if (disposing && Directory.Exists(_uploadDirectory))
         {

@@ -49,30 +49,19 @@ public static class DependencyInjection
                 .ToList()
         }));
 
-        var llmApiKey = FirstNonEmpty(
-            configuration[$"{OpenAiOptions.SectionName}:ApiKey"],
-            Environment.GetEnvironmentVariable("OPENAI_API_KEY"),
-            Environment.GetEnvironmentVariable("LITELLM_API_KEY"));
-        var llmModel = FirstNonEmpty(
-            configuration[$"{OpenAiOptions.SectionName}:Model"],
-            Environment.GetEnvironmentVariable("OPENAI_MODEL"),
-            Environment.GetEnvironmentVariable("LITELLM_MODEL"));
-        var llmBaseUrl = FirstNonEmpty(
-            Environment.GetEnvironmentVariable("OPENAI_BASE_URL"),
-            Environment.GetEnvironmentVariable("LITELLM_BASE_URL"),
-            configuration[$"{OpenAiOptions.SectionName}:BaseUrl"],
-            "https://api.openai.com/v1");
-        var normalizedLlmBaseUrl = EnsureTrailingSlash(llmBaseUrl ?? "https://api.openai.com/v1");
-
-        services.AddSingleton(Options.Create(new OpenAiOptions
-        {
-            ApiKey = llmApiKey ?? string.Empty,
-            Model = llmModel ?? string.Empty,
-            CoordinatorModel = Environment.GetEnvironmentVariable("ARGUS_COORDINATOR_MODEL") ?? string.Empty,
-            InvestigatorModel = Environment.GetEnvironmentVariable("ARGUS_INVESTIGATOR_MODEL") ?? string.Empty,
-            ResponseModel = Environment.GetEnvironmentVariable("ARGUS_RESPONSE_MODEL") ?? string.Empty,
-            BaseUrl = normalizedLlmBaseUrl
-        }));
+        services.AddOptions<OpenRouterOptions>()
+            .Configure(options =>
+            {
+                options.ApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY")?.Trim() ?? configuration["OpenRouter:ApiKey"]?.Trim() ?? string.Empty;
+                options.Model = Environment.GetEnvironmentVariable("OPENROUTER_MODEL")?.Trim() ?? configuration["OpenRouter:Model"]?.Trim() ?? options.Model;
+                options.BaseUrl = Environment.GetEnvironmentVariable("OPENROUTER_BASE_URL")?.Trim() ?? configuration["OpenRouter:BaseUrl"]?.Trim() ?? options.BaseUrl;
+                options.SiteUrl = Environment.GetEnvironmentVariable("OPENROUTER_SITE_URL")?.Trim() ?? configuration["OpenRouter:SiteUrl"]?.Trim();
+                options.AppName = Environment.GetEnvironmentVariable("OPENROUTER_APP_NAME")?.Trim() ?? configuration["OpenRouter:AppName"]?.Trim() ?? options.AppName;
+                options.TimeoutSeconds = int.TryParse(Environment.GetEnvironmentVariable("OPENROUTER_TIMEOUT_SECONDS") ?? configuration["OpenRouter:TimeoutSeconds"], out var timeout) ? timeout : options.TimeoutSeconds;
+                options.MaxRetries = int.TryParse(Environment.GetEnvironmentVariable("OPENROUTER_MAX_RETRIES") ?? configuration["OpenRouter:MaxRetries"], out var retries) ? retries : options.MaxRetries;
+            })
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<OpenRouterOptions>, OpenRouterOptionsValidator>();
 
         services.AddDbContext<ArgusDbContext>(options =>
         {
@@ -106,27 +95,16 @@ public static class DependencyInjection
         services.AddScoped<IInvestigationTool, EmailAuthenticationTool>();
         services.AddScoped<IInvestigationTool, UrlInspectionTool>();
         services.AddScoped<IInvestigationTool, MitreMappingTool>();
-        services.AddHttpClient<ILlmClient, OpenAiLlmClient>(client =>
+        services.AddHttpClient<OpenRouterLlmClient>((serviceProvider, client) =>
         {
-            client.BaseAddress = new Uri(normalizedLlmBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(90);
+            var options = serviceProvider.GetRequiredService<IOptions<OpenRouterOptions>>().Value;
+            client.BaseAddress = new Uri(EnsureTrailingSlash(options.BaseUrl));
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("ARGUS/1.0");
         });
+        services.AddTransient<ILlmClient>(serviceProvider => serviceProvider.GetRequiredService<OpenRouterLlmClient>());
 
         return services;
-    }
-
-    private static string? FirstNonEmpty(params string?[] values)
-    {
-        foreach (var value in values)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-        }
-
-        return null;
     }
 
     private static string EnsureTrailingSlash(string value)

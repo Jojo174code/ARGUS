@@ -124,6 +124,10 @@ function renderActionType(actionType: ResponseAction['actionType']): string {
   }
 }
 
+function isTerminalWorkflowStatus(status: AgenticWorkflowResultResponse['status']): boolean {
+  return status === 'Completed' || status === 'Failed' || status === 'AwaitingInformation';
+}
+
 export function IncidentPage() {
   const { id } = useParams<{ id: string }>();
   const [incident, setIncident] = useState<Incident | null>(null);
@@ -145,6 +149,7 @@ export function IncidentPage() {
   const [runningInvestigator, setRunningInvestigator] = useState(false);
   const [generatingResponsePackage, setGeneratingResponsePackage] = useState(false);
   const [runningWorkflow, setRunningWorkflow] = useState(false);
+  const [isWorkflowPolling, setIsWorkflowPolling] = useState(false);
   const [selectedQuizAnswers, setSelectedQuizAnswers] = useState<Record<string, number>>({});
   const [submittedQuizAnswers, setSubmittedQuizAnswers] = useState<Record<string, boolean>>({});
 
@@ -325,6 +330,55 @@ export function IncidentPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!id || !isWorkflowPolling) {
+      return;
+    }
+
+    const incidentId = id;
+    let disposed = false;
+    let requestInFlight = false;
+
+    async function pollWorkflow(): Promise<void> {
+      if (requestInFlight) {
+        return;
+      }
+
+      requestInFlight = true;
+      try {
+        const nextWorkflow = await getWorkflow(incidentId);
+        if (disposed) {
+          return;
+        }
+
+        setWorkflow(nextWorkflow);
+        if (isTerminalWorkflowStatus(nextWorkflow.status)) {
+          setIsWorkflowPolling(false);
+        }
+      } catch (pollError) {
+        if (disposed) {
+          return;
+        }
+
+        if (pollError instanceof Error && 'status' in pollError && (pollError as { status?: number }).status === 404) {
+          return;
+        }
+
+        setWorkflowError(pollError instanceof Error ? pollError.message : 'Failed to refresh workflow status.');
+      } finally {
+        requestInFlight = false;
+      }
+    }
+
+    void pollWorkflow();
+    const intervalId = window.setInterval(() => void pollWorkflow(), 1500);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(intervalId);
+    };
+  }, [id, isWorkflowPolling]);
+
   async function handleFileSelection(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const nextFile = event.target.files?.[0] ?? null;
     if (!nextFile) {
@@ -500,11 +554,16 @@ export function IncidentPage() {
     }
 
     setRunningWorkflow(true);
+    setIsWorkflowPolling(true);
+    setWorkflow(null);
     setWorkflowError(null);
 
     try {
       const nextWorkflow = await runFullWorkflow(id);
       setWorkflow(nextWorkflow);
+      if (isTerminalWorkflowStatus(nextWorkflow.status)) {
+        setIsWorkflowPolling(false);
+      }
 
       const refreshedIncident = await getIncident(id);
       setIncident(refreshedIncident);
@@ -668,7 +727,7 @@ export function IncidentPage() {
         {workflowError ? <ErrorBanner message={workflowError} /> : null}
       </article>
 
-      {workflow ? <WorkflowTimeline workflow={workflow} /> : null}
+      <WorkflowTimeline workflow={workflow} isActive={isWorkflowPolling} />
 
       <article className="card space-stack">
         <h2>Email Evidence Upload</h2>

@@ -1,91 +1,159 @@
 import type { AgenticWorkflowResultResponse, WorkflowRunStatus, WorkflowStageResult } from '../api/types';
 
-function renderDate(value: string | null): string {
-  if (!value) {
-    return 'Not recorded';
-  }
+const stageDefinitions = [
+  {
+    key: 'DeterministicAnalysis',
+    label: 'Analyzing Email',
+    description: 'ARGUS is checking headers, authentication results, URLs, and phishing indicators.',
+  },
+  {
+    key: 'Coordinator',
+    label: 'Planning Investigation',
+    description: 'The Coordinator Agent is building an evidence-grounded investigation plan.',
+  },
+  {
+    key: 'Investigator',
+    label: 'Investigating Evidence',
+    description: 'The Investigator Agent is reviewing available evidence and synthesizing findings.',
+  },
+  {
+    key: 'ResponseEducation',
+    label: 'Generating Response & Education',
+    description: 'ARGUS is preparing recommended actions and an incident-specific learning module.',
+  },
+] as const;
 
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+type StageKey = (typeof stageDefinitions)[number]['key'];
+
+function isTerminal(status: WorkflowRunStatus): boolean {
+  return status === 'Completed' || status === 'Failed' || status === 'AwaitingInformation';
 }
 
-function renderDuration(stage: WorkflowStageResult): string | null {
-  if (!stage.startedAt || !stage.completedAt) {
-    return null;
-  }
-
-  const startedAt = new Date(stage.startedAt).getTime();
-  const completedAt = new Date(stage.completedAt).getTime();
-  if (Number.isNaN(startedAt) || Number.isNaN(completedAt) || completedAt < startedAt) {
-    return null;
-  }
-
-  return `${(completedAt - startedAt).toFixed(0)} ms`;
+function getStage(workflow: AgenticWorkflowResultResponse | null, key: StageKey): WorkflowStageResult | undefined {
+  return workflow?.stages.find((stage) => stage.stage === key);
 }
 
-function renderStageLabel(stage: string): string {
-  switch (stage) {
-    case 'DeterministicAnalysis':
-      return 'Deterministic Analysis';
-    case 'ResponseEducation':
-      return 'Response & Learning';
-    default:
-      return stage;
-  }
+function getStageLabel(key: string | null): string | null {
+  return stageDefinitions.find((stage) => stage.key === key)?.label ?? key;
 }
 
-function renderStatus(status: WorkflowRunStatus): string {
-  return status === 'AwaitingInformation' ? 'Awaiting Information' : status;
+function getStageProgress(workflow: AgenticWorkflowResultResponse | null): number {
+  if (!workflow) {
+    return 0;
+  }
+
+  if (workflow.status === 'Completed') {
+    return 100;
+  }
+
+  return stageDefinitions.filter((stage) => getStage(workflow, stage.key)?.status === 'Completed').length * 20;
+}
+
+function getActivity(workflow: AgenticWorkflowResultResponse | null, isActive: boolean): { heading: string; description: string; stage: StageKey | null } {
+  if (!workflow) {
+    return {
+      heading: isActive ? 'Starting Investigation' : 'Workflow Not Started',
+      description: isActive ? 'ARGUS is starting the investigation workflow.' : 'Run the full workflow to begin the investigation.',
+      stage: null,
+    };
+  }
+
+  if (workflow.status === 'Completed') {
+    return {
+      heading: 'Investigation Complete',
+      description: 'ARGUS has completed the analysis, investigation, and response preparation stages.',
+      stage: null,
+    };
+  }
+
+  if (workflow.status === 'AwaitingInformation') {
+    return {
+      heading: 'Additional Information Needed',
+      description: 'Additional information is needed before ARGUS can continue.',
+      stage: null,
+    };
+  }
+
+  if (workflow.status === 'Failed') {
+    return {
+      heading: 'Workflow Paused',
+      description: workflow.failureMessage ?? 'ARGUS could not complete the current workflow stage.',
+      stage: null,
+    };
+  }
+
+  const activeDefinition = stageDefinitions.find((stage) => getStage(workflow, stage.key)?.status === 'Running');
+  return activeDefinition
+    ? { heading: activeDefinition.label, description: activeDefinition.description, stage: activeDefinition.key }
+    : { heading: 'Starting Investigation', description: 'ARGUS is preparing the next workflow stage.', stage: null };
 }
 
 interface WorkflowTimelineProps {
-  workflow: AgenticWorkflowResultResponse;
+  workflow: AgenticWorkflowResultResponse | null;
+  isActive?: boolean;
 }
 
-export function WorkflowTimeline({ workflow }: WorkflowTimelineProps) {
+export function WorkflowTimeline({ workflow, isActive = false }: WorkflowTimelineProps) {
+  const progress = getStageProgress(workflow);
+  const activity = getActivity(workflow, isActive);
+  const isIndeterminate = isActive && !isTerminal(workflow?.status ?? 'Running');
+
   return (
-    <article className="card space-stack">
-      <h2>Workflow Timeline</h2>
-      <div className="row-between wrap-gap">
-        <span>Workflow status: {renderStatus(workflow.status)}</span>
-        <span>Started {renderDate(workflow.startedAt)}</span>
-      </div>
-      {workflow.completedAt ? <p>Completed {renderDate(workflow.completedAt)}</p> : null}
-      <ul className="missing-info-list">
-        {workflow.stages.map((stage) => (
-          <li key={stage.stage}>
-            <strong>{renderStageLabel(stage.stage)}</strong>
-            <p>
-              <strong>Status:</strong> {renderStatus(stage.status)}
-            </p>
-            {renderDuration(stage) ? (
-              <p>
-                <strong>Duration:</strong> {renderDuration(stage)}
-              </p>
-            ) : null}
-            {stage.summary ? <p>{stage.summary}</p> : null}
-            {stage.error ? (
-              <p>
-                <strong>Error:</strong> {stage.error}
-              </p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-
-      <div className="card-inner">
-        <h3>Workflow Summary</h3>
-        <p>Workflow completed in {(workflow.metrics.durationMilliseconds / 1000).toFixed(1)}s</p>
-        <p>{workflow.stages.filter((stage) => stage.status === 'Completed').length} stages completed</p>
-        <p>{workflow.metrics.coordinatorTaskCount} investigation tasks planned</p>
-        <p>{workflow.metrics.investigatorFindingCount} findings produced</p>
-        <p>{workflow.metrics.responseActionCount} response actions generated</p>
-        <p>{workflow.metrics.quizQuestionCount} learning questions created</p>
+    <article className="card workflow-progress" aria-labelledby="workflow-progress-title">
+      <div className="workflow-progress-header">
+        <div>
+          <p className="workflow-progress-kicker">ARGUS AI Investigation</p>
+          <h2 id="workflow-progress-title">{activity.heading}</h2>
+          <p>{activity.description}</p>
+        </div>
+        <span className={`workflow-status workflow-status-${workflow?.status.toLowerCase() ?? 'pending'}`}>
+          {workflow?.status === 'AwaitingInformation' ? 'Awaiting Information' : workflow?.status ?? 'Preparing'}
+        </span>
       </div>
 
-      {workflow.status === 'AwaitingInformation' && workflow.blockingMissingInformation.length > 0 ? (
-        <div className="card-inner">
-          <h3>ARGUS needs more information before continuing.</h3>
+      <div
+        className="workflow-progress-track"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        aria-valuetext={isIndeterminate ? `${activity.heading} is in progress. ${progress}% of workflow stages are complete.` : `${progress}% of workflow stages are complete.`}
+      >
+        <span className={isIndeterminate ? 'workflow-progress-fill is-indeterminate' : 'workflow-progress-fill'} style={{ width: `${progress}%` }} />
+      </div>
+      <p className="workflow-progress-measure">Stage-based progress: {progress}%</p>
+
+      <ol className="workflow-stage-list" aria-label="Workflow stages">
+        {stageDefinitions.map((definition) => {
+          const stage = getStage(workflow, definition.key);
+          const status = stage?.status ?? 'Pending';
+          const isCurrent = activity.stage === definition.key && status === 'Running';
+          const stageDescription = status === 'Running'
+            ? definition.description
+            : status === 'Completed'
+              ? 'Completed'
+              : status === 'Failed'
+                ? stage?.error ?? 'This stage could not be completed.'
+                : status === 'AwaitingInformation'
+                  ? 'Additional information is required before continuing.'
+                  : 'Waiting for the previous stage.';
+
+          return (
+            <li key={definition.key} className={`workflow-stage workflow-stage-${status.toLowerCase()}${isCurrent ? ' is-current' : ''}`}>
+              <span className="workflow-stage-marker" aria-hidden="true" />
+              <div>
+                <strong>{definition.label}</strong>
+                <p>{stageDescription}</p>
+              </div>
+              <span className="sr-only">{definition.label}: {status === 'AwaitingInformation' ? 'Awaiting Information' : status}</span>
+            </li>
+          );
+        })}
+      </ol>
+
+      {workflow?.status === 'AwaitingInformation' && workflow.blockingMissingInformation.length > 0 ? (
+        <div className="workflow-progress-detail">
+          <h3>Additional information is needed before ARGUS can continue.</h3>
           <ul className="missing-info-list">
             {workflow.blockingMissingInformation.map((item) => (
               <li key={item.question}>
@@ -97,12 +165,10 @@ export function WorkflowTimeline({ workflow }: WorkflowTimelineProps) {
         </div>
       ) : null}
 
-      {workflow.status === 'Failed' && workflow.failureStage ? (
-        <div className="card-inner">
+      {workflow?.status === 'Failed' ? (
+        <div className="workflow-progress-detail workflow-progress-failure" role="alert">
           <h3>Workflow Failure</h3>
-          <p>
-            <strong>Stage:</strong> {renderStageLabel(workflow.failureStage)}
-          </p>
+          {workflow.failureStage ? <p><strong>Stage:</strong> {getStageLabel(workflow.failureStage)}</p> : null}
           {workflow.failureMessage ? <p>{workflow.failureMessage}</p> : null}
         </div>
       ) : null}

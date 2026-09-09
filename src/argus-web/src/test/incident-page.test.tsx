@@ -470,14 +470,10 @@ describe('IncidentPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Run Full ARGUS Workflow' }));
 
-    expect(await screen.findByText('Workflow Timeline')).toBeInTheDocument();
-    expect(screen.getByText('Workflow status: Completed')).toBeInTheDocument();
-    expect(screen.getAllByText('Deterministic Analysis').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Response & Learning').length).toBeGreaterThan(0);
-    expect(screen.getByText('Workflow completed in 3.0s')).toBeInTheDocument();
-    expect(screen.getByText('2 investigation tasks planned')).toBeInTheDocument();
-    expect(screen.getByText('1 findings produced')).toBeInTheDocument();
-    expect(screen.getByText('3 response actions generated')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Investigation Complete' })).toBeInTheDocument();
+    expect(screen.getByText('Stage-based progress: 100%')).toBeInTheDocument();
+    expect(screen.getAllByText('Analyzing Email').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Generating Response & Education').length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Generate Investigation Plan' }));
 
@@ -717,9 +713,9 @@ describe('IncidentPage', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Workflow Timeline')).toBeInTheDocument();
-    expect(screen.getByText('Workflow status: Awaiting Information')).toBeInTheDocument();
-    expect(screen.getByText('ARGUS needs more information before continuing.')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Additional Information Needed' })).toBeInTheDocument();
+    expect(screen.getByText('Awaiting Information')).toBeInTheDocument();
+    expect(screen.getAllByText('Additional information is needed before ARGUS can continue.').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Did the user enter credentials?').length).toBeGreaterThan(0);
     expect(screen.getAllByText('This blocks downstream response decisions.').length).toBeGreaterThan(0);
     expect(screen.getByText('Response & Learning status: Not started')).toBeInTheDocument();

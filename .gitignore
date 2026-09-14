@@ -13,7 +13,7 @@
 # .NET
 **/bin/
 **/obj/
-TestResults/
+**/TestResults/
 
 # Node
 **/node_modules/
@@ -21,9 +21,11 @@ TestResults/
 
 # Logs
 *.log
+**/logs/
 
 # Coverage
 coverage/
+**/coverage/
 
 # Evaluation artifacts
 artifacts/evaluation/latest.json

@@ -1,223 +1,323 @@
 # ARGUS
 
-ARGUS is a phishing incident investigation platform for nonprofits, churches, schools, and small businesses.
+ARGUS is an AI-assisted cyber incident clinic that analyzes suspicious email evidence, coordinates a bounded investigation, generates evidence-grounded findings, recommends response actions, and teaches users how to recognize similar threats.
 
-It turns uploaded email evidence into an auditable path from **deterministic signals** to **investigator findings** and **human-approved response actions**. It is designed to make incident response understandable for non-technical community teams without hiding or automating consequential decisions.
+It is designed for small organizations, nonprofits, churches, schools, small businesses, cyber clinics, and teams without a dedicated security operations center. ARGUS supports investigation and learning; it does not replace professional incident response.
 
-The current implementation supports:
+## Overview
 
-- deterministic phishing analysis from uploaded .eml evidence
-- coordinator planning for bounded investigation tasks
-- investigator synthesis grounded in deterministic tool output
-- response and education guidance grounded in validated investigator findings
-- unified workflow orchestration with persisted stage status and resume behavior
-- deterministic evaluation of safety, grounding, and prompt-injection resistance
-- persisted incident, evidence, analysis, coordinator run, investigator run, and response/education run history
-- guided Evidence, Results, and Education workspaces for non-technical users
-- interactive Incident Map showing structured Evidence → Findings → Actions relationships
-- incident-specific education, knowledge checks, and a plain-language assistant
+Small organizations often need to investigate phishing reports without dedicated security analysts. ARGUS provides a guided workflow that combines deterministic email analysis with bounded AI agents, keeping evidence, findings, and recommendations reviewable. It does not autonomously perform destructive remediation.
 
-## Current Architecture
+## Key Features
 
-- Backend: ASP.NET Core 9, EF Core 9, PostgreSQL provider, InMemory test provider
-- Frontend: React 19 + Vite + TypeScript
-- AI integration: provider abstraction via ILlmClient with OpenAI-compatible implementation
+- Secure `.eml` evidence upload with SHA-256 integrity fingerprints
+- Deterministic phishing analysis, explainable risk scoring, email authentication checks, and URL inspection
+- MITRE ATT&CK mapping and structured Evidence -> Findings -> Actions visualization
+- Coordinator Agent, Investigator Agent, and Response & Education Agent
+- Evidence-grounded findings and human-in-the-loop response recommendations
+- Incident-specific cybersecurity education, knowledge checks, and plain-language assistance
+- Guided workflow UI, persisted workflow progress, and visual results dashboard
+- Prompt-injection defenses, structured model outputs, and persisted/auditable investigation state
 
-## Repository Layout
+## How ARGUS Works
 
-- src/Argus.Api: API host and controllers
-- src/Argus.Application: use-case services, DTOs, validation
-- src/Argus.Domain: domain entities and models
-- src/Argus.Infrastructure: persistence, repositories, AI provider, migrations
-- src/argus-web: React frontend
-- tests/Argus.UnitTests: unit tests
-- tests/Argus.IntegrationTests: API integration tests
-- tests/Argus.EvaluationTests: deterministic safety and grounding evaluations
+```text
+Email Evidence (.eml)
+	|
+	v
+Deterministic Analysis
+	|
+	v
+Coordinator Agent
+	|
+	v
+Investigator Agent
+	|
+	v
+Response & Education Agent
+	|
+	v
+Findings + Actions + Education
+```
 
-## Product Experience
+Deterministic analysis happens before AI. Each AI agent has a bounded responsibility and works from structured evidence and prior persisted output.
 
-ARGUS keeps the workflow visible and reviewable at every step:
+## Safety Model
 
-1. **Create an incident**: capture the organization context and report details.
-2. **Upload evidence**: add one or more `.eml` messages for deterministic analysis.
-3. **Guide the investigation**: run the workflow in one click or stage by stage.
-4. **Trace the result**: use the Incident Map to follow supported relationships from triggered signals, through findings, to recommended actions.
-5. **Educate the team**: review plain-language guidance, warning signs, and short knowledge checks.
+- ARGUS does not execute email attachments or automatically visit malicious URLs.
+- ARGUS does not change passwords, block accounts, or autonomously remediate production systems.
+- Evidence references are validated and unknown references are rejected.
+- Security-changing recommendations require human approval.
+- Prompt injection in email content is treated as hostile data, not instructions.
+- Structured model outputs and deterministic analysis precede AI-assisted conclusions.
 
-The Incident Map never renders hidden LLM reasoning. Its edges are created only from persisted structured references: an investigator finding's evidence reference and a response action's `supportingFindingIds`.
+## Tech Stack
+
+| Area | Technology |
+| --- | --- |
+| Backend | .NET 9, ASP.NET Core Web API, Entity Framework Core, MimeKit |
+| Storage | PostgreSQL support for relational deployments; InMemory provider for Development and tests |
+| Frontend | React 19, TypeScript, Vite |
+| AI | OpenRouter; default model `deepseek/deepseek-v4-pro-0813` |
+| Testing | .NET unit, integration, and evaluation tests; Vitest and Testing Library |
+
+## Project Structure
+
+```text
+ARGUS/
+├── src/
+│   ├── Argus.Api/            # API host, controllers, startup configuration
+│   ├── Argus.Application/    # use cases, validation, agents, investigation tools
+│   ├── Argus.Domain/         # domain entities and core models
+│   ├── Argus.Infrastructure/ # persistence, email parsing, OpenRouter client, migrations
+│   └── argus-web/            # React frontend
+├── tests/                    # unit, integration, and deterministic evaluation projects
+├── .env.example              # safe environment-variable template
+└── README.md
+```
 
 ## Prerequisites
 
+- Git
 - .NET SDK 9.x
-- Node.js 20+
-- npm 10+
-- PostgreSQL 14+ (for relational local runs)
+- Node.js 20+ and npm 10+
+- An OpenRouter API key
+- PostgreSQL only when running with the PostgreSQL configuration; Development uses InMemory by default
 
-## Environment Setup
+## Quick Start
 
-Create a local environment file from .env.example and set values:
+### 1. Clone the repository
 
 ```bash
-OPENAI_API_KEY=
-OPENAI_MODEL=
-OPENAI_BASE_URL=https://api.openai.com/v1
+git clone https://github.com/Jojo174code/ARGUS.git
+cd ARGUS
 ```
 
-ARGUS uses an OpenAI-compatible client for the coordinator stage, so a LiteLLM proxy works as long as you point `OPENAI_BASE_URL` at it and set the matching API key and model. You can also use the `LITELLM_*` aliases in `.env.example` if you prefer.
+### 2. Create local environment settings
 
-Backend defaults are in src/Argus.Api/appsettings.json, including:
+macOS/Linux:
 
-- ConnectionStrings:ArgusDatabase
-- Database:Provider (Postgres or InMemory)
+```bash
+cp .env.example .env
+```
 
-## Running ARGUS
+Windows PowerShell:
 
-### 1. Restore and build
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` with your OpenRouter credential. Do not commit this file.
+
+```dotenv
+OPENROUTER_API_KEY=your-openrouter-key
+OPENROUTER_MODEL=deepseek/deepseek-v4-pro-0813
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_SITE_URL=http://localhost
+OPENROUTER_APP_NAME=ARGUS
+OPENROUTER_TIMEOUT_SECONDS=120
+OPENROUTER_MAX_RETRIES=2
+```
+
+### 3. Run the backend
 
 ```bash
 dotnet restore
-dotnet build
-```
-
-### 2. Apply database migrations
-
-```bash
-dotnet tool restore
-dotnet tool run dotnet-ef database update \
-	--project src/Argus.Infrastructure \
-	--startup-project src/Argus.Api
-```
-
-### 3. Run backend API
-
-```bash
 dotnet run --project src/Argus.Api
 ```
 
-Default local API URL from launch settings:
+The Development API listens at `http://localhost:5056`. Development defaults to an InMemory database, so no PostgreSQL setup is required for a first run.
 
-- http://localhost:5056
+### 4. Run the frontend
 
-### 4. Run frontend
+In a second terminal:
 
 ```bash
 cd src/argus-web
 npm install
-npm run dev
+npm run dev -- --host localhost --port 5173
 ```
 
-Set VITE_API_BASE_URL if needed (default client fallback points to http://localhost:5056).
+Open `http://localhost:5173`.
 
-Open the Vite URL shown in the terminal, then choose **New Incident**. The app presents a short, skippable loading animation before the incident form.
+### 5. Follow the workflow
 
-## How To Use ARGUS (Current Features)
+**New Incident** -> **Evidence** -> upload `.eml` -> **Guide** -> run the workflow -> **Results** -> **Learn**.
 
-1. Create an incident.
-2. Upload one or more .eml evidence files.
-3. Run Full ARGUS Workflow to orchestrate deterministic analysis, Coordinator, Investigator, and Response & Learning.
-4. Inspect each stage individually if needed using the existing stage-specific actions.
-5. Complete the incident-specific learning questions on the incident page.
-6. Reload the incident page to view persisted workflow, coordinator, investigator, and response/learning outputs.
+## Verify OpenRouter
 
-## API Flow (Phase 2A + 2B + 2C + 3)
-
-1. POST /api/incidents
-2. POST /api/incidents/{id}/evidence/email
-3. POST /api/incidents/{id}/analyze
-4. POST /api/incidents/{id}/coordinator/plan
-5. GET /api/incidents/{id}/coordinator/plan
-6. POST /api/incidents/{id}/investigator/run
-7. GET /api/incidents/{id}/investigator/report
-8. POST /api/incidents/{id}/response/generate
-9. GET /api/incidents/{id}/response
-10. POST /api/incidents/{id}/workflow/run
-11. GET /api/incidents/{id}/workflow
-
-## Unified Workflow Behavior
-
-The unified workflow is a deterministic orchestrator over the existing stages. It does not create hidden agents or autonomous loops.
-
-- Reuses completed deterministic analysis, Coordinator, Investigator, and Response & Learning outputs when they are still valid for the current incident.
-- Resumes safely from the last incomplete stage when a prior workflow run failed.
-- Stops in Awaiting Information when the Coordinator marks missing information as blocking.
-- Preserves stage-by-stage visibility for debugging and demonstrations.
-
-## EF Core Migration Workflow
-
-Migrations are stored in src/Argus.Infrastructure/Migrations and use src/Argus.Api as startup.
-
-Add a migration:
+When the API runs in Development, verify configuration and authentication without exposing credentials:
 
 ```bash
-dotnet tool run dotnet-ef migrations add <Name> \
-	--project src/Argus.Infrastructure \
-	--startup-project src/Argus.Api
+curl -sS http://localhost:5056/api/development/openrouter/status
 ```
 
-Apply migrations:
+Expected shape:
+
+```json
+{
+  "provider": "OpenRouter",
+  "model": "deepseek/deepseek-v4-pro-0813",
+  "authenticationSucceeded": true,
+  "httpStatus": 200,
+  "error": null
+}
+```
+
+This endpoint is Development-only. Never paste an API key into issue reports, logs, or source files.
+
+## Using ARGUS
+
+### 1. Create an Incident
+
+Create a case with organization and reporter context.
+
+### 2. Upload Evidence
+
+Upload the suspicious message in `.eml` format. The maximum file size is 2 MB.
+
+### 3. Use Guide
+
+Run individual stages or the Full Workflow. The workflow starts with deterministic analysis, then runs the Coordinator Agent, Investigator Agent, and Response & Education Agent as applicable.
+
+### 4. Review Results
+
+Use **What ARGUS Found** to review risk, confidence, findings, and recommended actions. Review recommendations before taking security-changing action.
+
+### 5. Learn
+
+Review the incident-specific education content, warning signs, knowledge checks, and plain-language assistant.
+
+## AI Workflow
+
+### Coordinator Agent
+
+Creates a bounded investigation plan and identifies missing information.
+
+### Investigator Agent
+
+Executes supported deterministic investigation tools and synthesizes evidence-grounded findings.
+
+### Response & Education Agent
+
+Produces prioritized, human-approved response recommendations and incident-specific learning material.
+
+All agents use the OpenRouter provider boundary but keep distinct responsibilities.
+
+## Investigation Tools
+
+The Investigator Agent can use these registered deterministic tools:
+
+- Email Metadata
+- Email Authentication
+- URL Inspection
+- MITRE Mapping
+
+## Testing
+
+Run all .NET tests from the repository root:
 
 ```bash
-dotnet tool run dotnet-ef database update \
-	--project src/Argus.Infrastructure \
-	--startup-project src/Argus.Api
+dotnet test
 ```
 
-Generate SQL script:
+Run frontend tests and a production build:
 
 ```bash
-dotnet tool run dotnet-ef migrations script \
-	--project src/Argus.Infrastructure \
-	--startup-project src/Argus.Api
+cd src/argus-web
+npm test
+npm run build
 ```
 
-List migrations:
-
-```bash
-dotnet tool run dotnet-ef migrations list \
-	--project src/Argus.Infrastructure \
-	--startup-project src/Argus.Api
-```
-
-Generate the full migration SQL script:
-
-```bash
-dotnet tool restore
-dotnet tool run dotnet-ef migrations script \
-  --project src/Argus.Infrastructure \
-  --startup-project src/Argus.Api
-```
-
-## Evaluation
-
-ARGUS includes a deterministic evaluation suite in tests/Argus.EvaluationTests.
-
-The synthetic dataset covers:
-
-- 10 benign emails
-- 10 obvious phishing emails
-- 10 subtle phishing or BEC-style emails
-- 5 prompt-injection emails
-- 5 malformed or edge-case emails
-
-Run the evaluation suite:
+Run deterministic evaluations:
 
 ```bash
 dotnet test tests/Argus.EvaluationTests/Argus.EvaluationTests.csproj
 ```
 
-Generated reports are written to:
+Evaluation output is generated under `artifacts/evaluation/` and is intentionally ignored. Evaluation results use deterministic fake providers and are not live-AI performance claims.
 
-- artifacts/evaluation/latest.json
-- artifacts/evaluation/latest.md
+## Demo Evidence
 
-The evaluation philosophy is simple and internal to ARGUS:
+Use only safe, synthetic email evidence included in the test projects. Do not test with active malware, credentials, or URLs you do not trust.
 
-- measure grounding rather than assume it
-- reject unsafe autonomous claims deterministically
-- treat prompt injection as hostile content, not instructions
-- keep results auditable and repeatable with deterministic fake providers
+## Configuration
 
-## Validation Commands
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `OPENROUTER_API_KEY` | Yes | None | OpenRouter API credential |
+| `OPENROUTER_MODEL` | No | `deepseek/deepseek-v4-pro-0813` | OpenRouter model identifier |
+| `OPENROUTER_BASE_URL` | No | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
+| `OPENROUTER_SITE_URL` | No | None | Optional OpenRouter HTTP-Referer value |
+| `OPENROUTER_APP_NAME` | No | `ARGUS` | OpenRouter application title |
+| `OPENROUTER_TIMEOUT_SECONDS` | No | `120` | HTTP request timeout, 10-300 seconds |
+| `OPENROUTER_MAX_RETRIES` | No | `2` | Transient request retry count, 0-3 |
+| `VITE_API_BASE_URL` | No | `http://localhost:5056` | Frontend API base URL |
+
+Environment variables take precedence over application configuration. Restart the backend after changing `.env`.
+
+## Troubleshooting
+
+### OpenRouter 401 or authentication failure
+
+- Verify `OPENROUTER_API_KEY` in `.env`.
+- Restart the backend after updating `.env`.
+- Use the Development-only status endpoint above to check authentication.
+- Check for stale shell environment variables, which take precedence over `.env` values.
+
+### Address already in use
+
+On macOS/Linux, identify the process using the API port:
+
+```bash
+lsof -i :5056
+```
+
+Stop the stale process, then run the API again.
+
+### Frontend cannot reach the backend
+
+- Confirm the API is running at `http://localhost:5056`.
+- Confirm the frontend is running at `http://localhost:5173`.
+- Check `VITE_API_BASE_URL` if you changed the API address.
+- The default CORS configuration permits `http://localhost:5173`.
+
+### Workflow unavailable
+
+First check the Development OpenRouter status endpoint. Then confirm that an `.eml` evidence file has been uploaded and the backend is still running.
+
+## API Overview
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/incidents` | Create an incident |
+| `GET` | `/api/incidents/{id}` | Get an incident |
+| `POST` | `/api/incidents/{id}/evidence/email` | Upload email evidence |
+| `POST` | `/api/incidents/{id}/analyze` | Run deterministic analysis |
+| `POST` | `/api/incidents/{id}/coordinator/plan` | Run the Coordinator Agent |
+| `POST` | `/api/incidents/{id}/investigator/run` | Run the Investigator Agent |
+| `POST` | `/api/incidents/{id}/response/generate` | Run Response & Education |
+| `POST` | `/api/incidents/{id}/workflow/run` | Run the unified workflow |
+| `GET` | `/api/incidents/{id}/workflow` | Get persisted workflow progress |
+
+Development Swagger is available when the API runs in Development.
+
+## Development Principles
+
+- Deterministic analysis before agentic processing
+- Evidence before conclusions
+- Bounded agents with explicit responsibilities
+- Human approval for consequential action
+- Transparent, structured findings
+- No autonomous destructive remediation
+
+## License
+
+No license file is currently included in this repository. Do not assume reuse rights without permission from the repository owner.
+
+## Project Status
+
+ARGUS is an actively developed cybersecurity research and competition project. Treat it as experimental software, not as a production replacement for professional incident response.
 
 Backend:
 

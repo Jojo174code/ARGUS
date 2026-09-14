@@ -25,9 +25,15 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { IncidentOverviewCharts } from '../components/IncidentOverviewCharts';
 import { IncidentWorkspaceNav } from '../components/IncidentWorkspaceNav';
 import { LoadingBlock } from '../components/LoadingBlock';
+import { WorkflowActionProgress } from '../components/WorkflowActionProgress';
+import { WorkflowTimeline } from '../components/WorkflowTimeline';
 
 function stageStatus(label: string, done: boolean): string {
   return done ? `${label}: done` : `${label}: next`;
+}
+
+function isTerminalWorkflowStatus(status: AgenticWorkflowResultResponse['status']): boolean {
+  return status === 'Completed' || status === 'Failed' || status === 'AwaitingInformation';
 }
 
 export function IncidentGuidePage() {
@@ -41,6 +47,7 @@ export function IncidentGuidePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [isWorkflowPolling, setIsWorkflowPolling] = useState(false);
 
   const hasEvidence = (incident?.evidenceItems.length ?? 0) > 0;
 
@@ -49,6 +56,8 @@ export function IncidentGuidePage() {
       {
         key: 'analysis',
         title: '1. Check The Email',
+        agent: 'ARGUS Analysis',
+        tone: 'analysis',
         description: 'Run a safe automated check to detect risk signals.',
         ready: hasEvidence,
         done: Boolean(analysis),
@@ -57,6 +66,8 @@ export function IncidentGuidePage() {
       {
         key: 'plan',
         title: '2. Build Investigation Plan',
+        agent: 'Coordinator Agent',
+        tone: 'coordinator',
         description: 'Create a step-by-step plan in plain language.',
         ready: Boolean(analysis),
         done: plan?.status === 'Completed',
@@ -65,6 +76,8 @@ export function IncidentGuidePage() {
       {
         key: 'investigator',
         title: '3. Generate Findings',
+        agent: 'Investigator Agent',
+        tone: 'investigator',
         description: 'Turn plan output into human-friendly findings.',
         ready: plan?.status === 'Completed' && Boolean(plan.plan?.readyForInvestigation),
         done: report?.status === 'Completed',
@@ -73,6 +86,8 @@ export function IncidentGuidePage() {
       {
         key: 'response',
         title: '4. Create Action Plan',
+        agent: 'Response & Education',
+        tone: 'response',
         description: 'Produce immediate actions and staff guidance.',
         ready: report?.status === 'Completed',
         done: responsePack?.status === 'Completed',
@@ -148,6 +163,54 @@ export function IncidentGuidePage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!id || !isWorkflowPolling) {
+      return;
+    }
+
+    const incidentId = id;
+    let cancelled = false;
+    let requestInFlight = false;
+
+    async function pollWorkflow(): Promise<void> {
+      if (requestInFlight) {
+        return;
+      }
+
+      requestInFlight = true;
+      try {
+        const nextWorkflow = await getWorkflow(incidentId);
+        if (cancelled) {
+          return;
+        }
+
+        setWorkflow(nextWorkflow);
+        if (isTerminalWorkflowStatus(nextWorkflow.status)) {
+          setIsWorkflowPolling(false);
+        }
+      } catch (pollError) {
+        if (cancelled) {
+          return;
+        }
+
+        if (pollError instanceof Error && 'status' in pollError && (pollError as { status?: number }).status === 404) {
+          return;
+        }
+
+        setError(pollError instanceof Error ? pollError.message : 'Failed to refresh workflow status.');
+      } finally {
+        requestInFlight = false;
+      }
+    }
+
+    void pollWorkflow();
+    const intervalId = window.setInterval(() => void pollWorkflow(), 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [id, isWorkflowPolling]);
+
   async function runAction(action: 'analysis' | 'plan' | 'investigator' | 'response' | 'workflow') {
     if (!id) {
       return;
@@ -156,6 +219,11 @@ export function IncidentGuidePage() {
 
     setBusyAction(action);
     setError(null);
+
+    if (action === 'workflow') {
+      setWorkflow(null);
+      setIsWorkflowPolling(true);
+    }
 
     try {
       if (action === 'analysis') {
@@ -171,7 +239,11 @@ export function IncidentGuidePage() {
         setResponsePack(await generateResponseEducationPackage(incidentId));
       }
       if (action === 'workflow') {
-        setWorkflow(await runFullWorkflow(incidentId));
+        const nextWorkflow = await runFullWorkflow(incidentId);
+        setWorkflow(nextWorkflow);
+        if (isTerminalWorkflowStatus(nextWorkflow.status)) {
+          setIsWorkflowPolling(false);
+        }
         try {
           setAnalysis(await getIncidentAnalysis(incidentId));
         } catch {
@@ -202,6 +274,9 @@ export function IncidentGuidePage() {
       }
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Action failed.');
+      if (action === 'workflow') {
+        setIsWorkflowPolling(false);
+      }
     } finally {
       setBusyAction(null);
     }
@@ -226,7 +301,7 @@ export function IncidentGuidePage() {
     <section className="space-stack">
       <IncidentWorkspaceNav incidentId={incident.id} />
 
-      <article className="card mission-strip">
+      <article className="card mission-strip guide-command-center">
         <div className="row-between wrap-gap">
           <div>
             <h1>Incident Guide</h1>
@@ -245,7 +320,7 @@ export function IncidentGuidePage() {
           </div>
           <div className="metric-tile">
             <span className="metric-label">Risk Level</span>
-            <strong className="metric-value">{analysis?.riskLevel ?? 'Not checked yet'}</strong>
+            <strong className={`metric-value risk-value risk-value-${analysis?.riskLevel?.toLowerCase() ?? 'unknown'}`}>{analysis?.riskLevel ?? 'Not checked yet'}</strong>
           </div>
           <div className="metric-tile">
             <span className="metric-label">Findings</span>
@@ -264,6 +339,8 @@ export function IncidentGuidePage() {
 
       {error ? <ErrorBanner message={error} /> : null}
 
+      <WorkflowTimeline workflow={workflow} isActive={isWorkflowPolling} />
+
       <article className="card space-stack">
         <div className="row-between wrap-gap">
           <h2>Step-by-Step Controls</h2>
@@ -271,7 +348,11 @@ export function IncidentGuidePage() {
         </div>
         <div className="step-card-grid">
           {cards.map((card) => (
-            <section key={card.key} className="step-card">
+            <section key={card.key} className={`step-card agent-card agent-card-${card.tone}${card.done ? ' is-complete' : ''}${busyAction === card.key ? ' is-active' : ''}`}>
+              <div className="agent-card-heading">
+                <span className="agent-mark" aria-hidden="true" />
+                <p className="agent-label">{card.agent}</p>
+              </div>
               <h3>{card.title}</h3>
               <p>{card.description}</p>
               <p className="soft-label">{stageStatus(card.title, card.done)}</p>
@@ -287,6 +368,7 @@ export function IncidentGuidePage() {
             </section>
           ))}
         </div>
+        {busyAction && busyAction !== 'workflow' ? <WorkflowActionProgress action={busyAction as 'analysis' | 'plan' | 'investigator' | 'response'} /> : null}
       </article>
 
       <article className="card space-stack">

@@ -10,19 +10,19 @@ export function IncidentWorkspaceNav({ incidentId }: IncidentWorkspaceNavProps) 
   return (
     <nav className="workspace-nav" aria-label="Incident workspace navigation">
       <NavLink to={basePath} end className={({ isActive }) => (isActive ? 'workspace-link active' : 'workspace-link')}>
-        Guide
+        <span className="workspace-link-dot" aria-hidden="true" />Guide
       </NavLink>
       <NavLink to={`${basePath}/evidence`} className={({ isActive }) => (isActive ? 'workspace-link active' : 'workspace-link')}>
-        Evidence
+        <span className="workspace-link-dot" aria-hidden="true" />Evidence
       </NavLink>
       <NavLink to={`${basePath}/results`} className={({ isActive }) => (isActive ? 'workspace-link active' : 'workspace-link')}>
-        Results
+        <span className="workspace-link-dot" aria-hidden="true" />Results
       </NavLink>
       <NavLink to={`${basePath}/education`} className={({ isActive }) => (isActive ? 'workspace-link active' : 'workspace-link')}>
-        Education
+        <span className="workspace-link-dot" aria-hidden="true" />Education
       </NavLink>
       <NavLink to={`${basePath}/details`} className={({ isActive }) => (isActive ? 'workspace-link active' : 'workspace-link')}>
-        Detailed View
+        <span className="workspace-link-dot" aria-hidden="true" />Detailed View
       </NavLink>
     </nav>
   );

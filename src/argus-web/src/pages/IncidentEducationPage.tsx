@@ -157,7 +157,7 @@ export function IncidentEducationPage() {
   }
 
   return (
-    <section className="space-stack">
+    <section className="space-stack education-workspace">
       <IncidentWorkspaceNav incidentId={incident.id} />
 
       <article className="card mission-strip">

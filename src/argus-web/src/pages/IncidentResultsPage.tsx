@@ -18,6 +18,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 import { IncidentOverviewCharts } from '../components/IncidentOverviewCharts';
 import { IncidentWorkspaceNav } from '../components/IncidentWorkspaceNav';
 import { LoadingBlock } from '../components/LoadingBlock';
+import { IncidentExecutiveSummary } from '../components/IncidentExecutiveSummary';
 
 export function IncidentResultsPage() {
   const { id } = useParams<{ id: string }>();
@@ -100,15 +101,17 @@ export function IncidentResultsPage() {
   }
 
   return (
-    <section className="space-stack">
+    <section className="space-stack results-workspace">
       <IncidentWorkspaceNav incidentId={incident.id} />
 
-      <article className="card mission-strip">
+      <article className="card mission-strip results-hero">
         <h1>Results Dashboard</h1>
         <p className="soft-label">Non-technical summary of risk, findings, and recommended actions.</p>
       </article>
 
       {error ? <ErrorBanner message={error} /> : null}
+
+      <IncidentExecutiveSummary analysis={analysis} report={report} responsePack={responsePack} />
 
       <IncidentOverviewCharts
         analysis={analysis}
@@ -117,7 +120,7 @@ export function IncidentResultsPage() {
         responsePackage={responsePack}
       />
 
-      <article className="card space-stack">
+      <article id="top-findings" className="card space-stack">
         <h2>Top Findings</h2>
         {report?.report?.findings?.length ? (
           <ul className="visual-list">

@@ -48,11 +48,14 @@ export function NewIncidentPage() {
   }
 
   return (
-    <section className="card">
-      <h1>New Incident</h1>
-      <p>Create an incident record before uploading an email evidence file.</p>
+    <section className="card new-incident-card">
+      <header className="new-incident-heading">
+        <p className="workflow-progress-kicker">Incident intake</p>
+        <h1>New Incident</h1>
+        <p>Create an incident record before uploading an email evidence file.</p>
+      </header>
       {error ? <ErrorBanner message={error} /> : null}
-      <form onSubmit={handleSubmit} className="form-grid">
+      <form onSubmit={handleSubmit} className="form-grid new-incident-form">
         <label>
           Organization Name
           <input

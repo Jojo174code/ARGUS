@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/argus-github-logo.png" alt="ARGUS: Agentic Cybersecurity Incident Response" width="720">
+  <img src="docs/assets/argus-github-logo.png" alt="ARGUS: Agentic Cybersecurity Incident Response" width="460">
 </p>
 
 <h1 align="center">ARGUS</h1>

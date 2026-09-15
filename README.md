@@ -74,12 +74,12 @@ Small organizations often need to investigate phishing reports without security 
 The demo follows the ARGUS flow from suspicious email evidence intake through deterministic analysis, AI investigation, response recommendations, and incident-specific education.
 
 <p align="center">
-  <a href="docs/media/demo/argus-demo.mov">
+  <a href="docs/media/demo/argus-demo.mp4">
     <img src="docs/media/screenshots/argus-guide-workflow.png" alt="Watch the ARGUS demo: guided investigation workflow with ARGUS Analysis, Coordinator Agent, Investigator Agent, and Response & Education" width="900">
   </a>
 </p>
 
-<p align="center"><strong><a href="docs/media/demo/argus-demo.mov">Watch the ARGUS Demo</a></strong></p>
+<p align="center"><strong><a href="docs/media/demo/argus-demo.mp4">Watch the ARGUS Demo</a></strong></p>
 
 ## Architecture
 

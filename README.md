@@ -25,6 +25,7 @@
 
 <p align="center">
   <a href="#quick-start"><img src="https://img.shields.io/badge/Quick_Start-8B1020?style=for-the-badge" alt="Quick Start"></a>
+  <a href="#demo"><img src="https://img.shields.io/badge/Demo-8B1020?style=for-the-badge" alt="Demo"></a>
   <a href="#architecture"><img src="https://img.shields.io/badge/Architecture-342A2C?style=for-the-badge" alt="Architecture"></a>
   <a href="#screenshots"><img src="https://img.shields.io/badge/Screenshots-342A2C?style=for-the-badge" alt="Screenshots"></a>
   <a href="#safety-model"><img src="https://img.shields.io/badge/Security-342A2C?style=for-the-badge" alt="Security"></a>
@@ -40,6 +41,7 @@ ARGUS is an AI-assisted cyber incident clinic for small organizations, nonprofit
 
 - [Overview](#overview)
 - [Features](#key-features)
+- [Demo](#demo)
 - [Architecture](#architecture)
 - [How ARGUS Works](#how-argus-works)
 - [Screenshots](#screenshots)
@@ -66,6 +68,18 @@ Small organizations often need to investigate phishing reports without security 
 - Incident-specific cybersecurity education, knowledge checks, and plain-language assistance
 - Guided workflow UI, persisted progress tracking, and visual results dashboard
 - Prompt-injection-resistant handling, structured model outputs, and persisted investigation state
+
+## Demo
+
+The demo follows the ARGUS flow from suspicious email evidence intake through deterministic analysis, AI investigation, response recommendations, and incident-specific education.
+
+<p align="center">
+  <a href="docs/media/demo/argus-demo.mov">
+    <img src="docs/media/screenshots/argus-guide-workflow.png" alt="Watch the ARGUS demo: guided investigation workflow with ARGUS Analysis, Coordinator Agent, Investigator Agent, and Response & Education" width="900">
+  </a>
+</p>
+
+<p align="center"><strong><a href="docs/media/demo/argus-demo.mov">Watch the ARGUS Demo</a></strong></p>
 
 ## Architecture
 
@@ -97,11 +111,45 @@ Deterministic analysis happens before AI. AI agents operate within distinct, bou
 
 ## Screenshots
 
-### Incident Intake
+### Product Tour
 
-The New Incident screen captures organization and reporter context before evidence upload.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>Incident Intake</strong><br>
+      Create a case with organization and reporter context before handling evidence.<br><br>
+      <img src="docs/media/screenshots/argus-new-incident.png" alt="ARGUS New Incident intake form" width="100%">
+    </td>
+    <td width="50%" valign="top">
+      <strong>Guided Investigation</strong><br>
+      Run deterministic analysis and bounded AI stages from one workspace.<br><br>
+      <img src="docs/media/screenshots/argus-guide-workflow.png" alt="ARGUS Guide showing the four investigation stages" width="100%">
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <strong>What ARGUS Found</strong><br>
+      Review workflow completion, risk signals, and response action mix.<br><br>
+      <img src="docs/media/screenshots/argus-results-dashboard.png" alt="ARGUS Results dashboard with workflow, risk, and response charts" width="100%">
+    </td>
+    <td width="50%" valign="top">
+      <strong>Evidence to Action</strong><br>
+      Trace supported relationships from evidence through findings to actions.<br><br>
+      <img src="docs/media/screenshots/argus-incident-map.png" alt="ARGUS Incident Map tracing evidence to findings and response actions" width="100%">
+    </td>
+  </tr>
+</table>
 
-![ARGUS New Incident screen](docs/screenshots/new-incident.png)
+### Incident Learning
+
+ARGUS turns an incident into practical team education with knowledge checks and a plain-language assistant.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/screenshots/argus-learning-knowledge-check.png" alt="ARGUS incident-specific cybersecurity knowledge check" width="100%"></td>
+    <td width="50%"><img src="docs/media/screenshots/argus-learning-assistant.png" alt="ARGUS education assistant for plain-language incident questions" width="100%"></td>
+  </tr>
+</table>
 
 ## Quick Start
 
@@ -287,7 +335,7 @@ ARGUS/
 │   ├── Argus.Infrastructure/ # persistence, MimeKit, OpenRouter, migrations
 │   └── argus-web/            # React frontend
 ├── tests/                    # unit, integration, and evaluation tests
-├── docs/screenshots/         # current UI screenshots used by this README
+├── docs/media/               # README screenshots and demo video
 └── .env.example              # safe local configuration template
 ```
 
